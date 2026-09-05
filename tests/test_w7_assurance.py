@@ -556,6 +556,52 @@ def test_causal_gate_evidence_ids_are_the_actual_intervention_records():
     assert obs_ev.id not in causal_gate.evidence_ids
 
 
+def test_mismatched_intervention_hypothesis_cannot_pass_causal_gate():
+    """SOS-W7-F03: a W5 hypothesis with intervention support whose
+    InterventionMetadata provenance does NOT match the actual W4 evidence record
+    must fail W5 authoritative validation and cannot PASS the causal gate.
+
+    The hypothesis is constructed directly (bypassing with_status) so it carries
+    intervention metadata that is inconsistent with the evidence provenance.
+    W7's causal gate delegates to W5's validate(known_evidence_records=...) and
+    must reject the mismatched hypothesis rather than trusting its unvalidated
+    support label."""
+    arch = graph()
+    ei = intervention_evidence()  # provenance: revision=REVISION, environment="production"
+    # Fabricate intervention metadata with a MISMATCHED revision.
+    bad_support = EvidenceSupport(
+        evidence_id=ei.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-08T12:00:00Z",
+            revision="WRONG-REVISION",  # mismatch with ei.provenance.implementation_revision
+            environment="production",
+        ),
+    )
+    h_bad = CausalHypothesis(
+        cause_subject="node-a", effect_subject="node-b",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="fabricated intervention", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "claimed", None),
+        supporting_evidence=(bad_support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    # Confirm W5 itself rejects the mismatched hypothesis (W5 authority).
+    with pytest.raises(ModelValidationError):
+        h_bad.validate(known_evidence_records={ei.id: ei})
+
+    c = candidate(e=ei, h=h_bad)
+    result = assure_candidate(
+        candidate=c, base_graph=arch, known_evidence={ei.id: ei}, known_hypotheses={h_bad.id: h_bad},
+        containment_policy_ref="governed-containment-exception-2026-001",
+    )
+    causal_gate = next(g for g in result.gates if g.name == "causal-qualification")
+    # The causal gate must NOT PASS on a mismatched/fabricated hypothesis.
+    assert causal_gate.status != AssuranceStatus.PASS
+    assert causal_gate.evidence_ids == ()  # no intervention record accepted
+    # Overall result must not be PASS.
+    assert result.status != AssuranceStatus.PASS
+
+
 # --- C8: multi-objective integrity ---
 
 

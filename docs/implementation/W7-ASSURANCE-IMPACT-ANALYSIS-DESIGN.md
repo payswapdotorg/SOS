@@ -56,7 +56,7 @@ cannot be offset by objective improvements.
 is **never SUCCESS** — risk is inherently uncertain. Each item has a mitigation or
 residual note. `RiskAssessment` is a non-empty collection.
 
-## Causal qualification (C6 — evidence-traceable, SOS-W7-F02)
+## Causal qualification (C6 — evidence-traceable + W5-authoritative, SOS-W7-F02/F03)
 
 The causal-qualification gate checks whether any W5 hypothesis referenced by the
 candidate has intervention-grade support (W5 `SupportKind.INTERVENTION` backed by
@@ -66,8 +66,17 @@ efficacy is never established from narrative or confidence.
 
 **SOS-W7-F02:** the gate's `evidence_ids` contains the **exact**
 `support.evidence_id` values used to establish PASS — not the candidate's full
-`reasoning_evidence_ids`. This makes the gate's justification auditable: the
-recorded evidence references are the actual supporting W4 intervention record(s).
+`reasoning_evidence_ids`. This makes the gate's justification auditable.
+
+**SOS-W7-F03:** before treating a hypothesis's intervention support as causal
+proof, `assure_candidate()` validates the hypothesis via W5's AUTHORITATIVE
+validation path (`CausalHypothesis.validate(known_evidence_records=known_evidence)`),
+which enforces intervention-grade W4 `EvidenceKind` + `InterventionMetadata`/
+provenance consistency. W7 does NOT duplicate W5 causal authority — it delegates
+to it. A malformed/fabricated hypothesis whose support metadata does not match
+the real W4 evidence provenance fails W5 validation, is recorded as a
+causal-validation failure, and cannot contribute a causal PASS (the gate FAILs
+on the malformed input rather than PASSing).
 
 ## Reversibility / containment (C7 — evidence/policy-backed, SOS-W7-F01)
 

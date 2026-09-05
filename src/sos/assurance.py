@@ -360,15 +360,33 @@ def assure_candidate(
         detail=hard_detail,
     ))
 
-    # --- C6: causal qualification (F02: evidence-traceable to the actual intervention record) ---
+    # --- C6: causal qualification (F02: evidence-traceable; F03: W5-authoritative validation) ---
     # Collect the exact intervention-grade support evidence ids that establish
     # the causal gate's PASS — not the candidate's full reasoning_evidence_ids.
+    #
+    # SOS-W7-F03: before treating a W5 hypothesis's intervention support as
+    # causal proof, validate the hypothesis via W5's AUTHORITATIVE validation
+    # path (CausalHypothesis.validate(known_evidence_records=known_evidence)),
+    # which enforces intervention-grade W4 EvidenceKind + InterventionMetadata/
+    # provenance consistency. W7 does NOT duplicate W5 causal authority; it
+    # delegates to it. A malformed/fabricated hypothesis whose support metadata
+    # does not match the real W4 evidence provenance fails W5 validation and
+    # cannot contribute a causal PASS.
     causal_evidence_ids: list[str] = []
     causal_status = AssuranceStatus.UNKNOWN
     causal_detail = "no intervention-grade causal evidence"
+    causal_validation_failures: list[str] = []
     for hid in candidate.reasoning_hypothesis_ids:
         h = known_hypotheses.get(hid)
         if h is None:
+            continue
+        # SOS-W7-F03: validate the hypothesis via W5's authoritative path before
+        # trusting its intervention support. If validation fails, record the
+        # failure and do NOT treat its support as causal proof.
+        try:
+            h.validate(known_evidence_records=known_evidence)
+        except ModelValidationError as exc:
+            causal_validation_failures.append(f"{hid}: {exc}")
             continue
         for support in h.supporting_evidence:
             if support.support_kind == SupportKind.INTERVENTION:
@@ -382,6 +400,14 @@ def assure_candidate(
         causal_status = AssuranceStatus.PASS
         causal_detail = (
             f"intervention-grade causal evidence present: {', '.join(causal_evidence_ids)}"
+        )
+    elif causal_validation_failures:
+        # At least one referenced hypothesis failed W5 authoritative validation
+        # (mismatched/fabricated intervention metadata). The gate cannot PASS.
+        causal_status = AssuranceStatus.FAIL
+        causal_detail = (
+            "causal hypothesis validation failed: "
+            + "; ".join(causal_validation_failures)
         )
     else:
         causal_detail = "observational evidence only; causal efficacy not established"
