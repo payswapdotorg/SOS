@@ -4,7 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w7-assurance`
 **Base SHA:** `08e1e6f18ae1b29b22ce5ce305c6f017832af370`
-**Latest implementation SHA:** `fb33b3b52a22107b91c1fe35df676ba295be1daa`
+**Latest implementation SHA:** `50e72152a0395d73140b4ea70ee0fcb5c65d891e`
 
 ## Dependency proof
 
@@ -18,6 +18,7 @@ W6 is authoritatively merged on `main` as `5697360b10f3b4c760d2d8edfb543ee2be145
 - evidence-backed PASS semantics;
 - BLOCK on missing, failed, inconclusive or non-success evidence;
 - deterministic assurance export;
+- authoritative W2 graph validation for candidates;
 - invariant tests.
 
 ## Explicit exclusions
@@ -44,4 +45,4 @@ Repository CI runs `python -m pytest`; this environment cannot resolve public Gi
 
 ## Architect disposition requested
 
-Review exact PR head `fb33b3b52a22107b91c1fe35df676ba295be1daa`, verify CI, and merge only the reviewed head. After merge, W8 becomes eligible.
+Review exact PR head `50e72152a0395d73140b4ea70ee0fcb5c65d891e`, verify CI, and merge only the reviewed head. After merge, W8 becomes eligible.
