@@ -4,7 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w6-candidate-search`
 **Base SHA:** `9e6ae000ef0e4df60b34bc81c11ba3f252b1b871`
-**Latest implementation SHA:** `02034e36dd0fa92e91df4fb63d2d0622fa0b9402`
+**Latest implementation SHA:** `f83c2a452e49308ee1c09788587267376f0fa030`
 
 ## Dependency proof
 
@@ -18,7 +18,8 @@ W3 merged as `713264759bc804e0cfec0f36e06801e3338e98f4`; W5 merged as `3de7eaa1d
 - Pareto/non-dominated ranking for conflicting objectives;
 - ArchitectureMemory prior signal without treating memory as proof;
 - W2 boundary validation and W1/W5 traceability;
-- deterministic candidate IDs/order and invariant tests.
+- collision-safe deterministic candidate IDs and deterministic ordering;
+- invariant tests.
 
 ## Explicit exclusions
 
@@ -47,4 +48,4 @@ The repository CI workflow runs `python -m pytest`; this execution environment c
 
 ## Architect disposition requested
 
-Review exact PR head and merge only the reviewed head. After merge, W7 becomes eligible.
+Review exact PR head `f83c2a452e49308ee1c09788587267376f0fa030` and merge only the reviewed head. After merge, W7 becomes eligible.
