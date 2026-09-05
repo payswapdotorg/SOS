@@ -36,5 +36,6 @@ from .model import (
     ValueModel,
     decide,
 )
+from .recovery import RecoveryFinding, RecoveryInventory, RecoveryReport, recover_repository
 
 __all__ = [name for name in globals() if not name.startswith("_")]
