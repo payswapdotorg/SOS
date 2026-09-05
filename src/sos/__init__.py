@@ -42,5 +42,6 @@ from .causal import ArchitectureMemory, ArchitectureMemoryStore, CausalHypothesi
 from .search import CandidateMetrics, CandidateState, RankedCandidates, SearchBudget, generate_candidates, pareto_front
 from .assurance import AssuranceCheck, AssurancePolicy, AssuranceResult, AssuranceVerdict, CheckKind, CheckState, ImpactAssessment, RiskAssessment, assure_candidate, export_assurance
 from .experiment import Experiment, ExperimentDesign, ExperimentStage, GuardrailTrigger, PromotionDecision, RollbackRecord, advance, export_experiment, promotion_from_assurance, rollback
+from .authority import AuthorityAction, AuthorityDecision, AuthorityGrant, AuthorityLedger, DecisionRequest, EvidenceQuality, evaluate
 
 __all__ = [name for name in globals() if not name.startswith("_")]
