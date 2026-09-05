@@ -4,7 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w8-experiment-plane`
 **Base SHA:** `ed35b4da1ea793c8b150519e9570f1355a34a994`
-**Latest implementation SHA:** `3711d763d72e88e49316b8baa2b5bbefb9ffd2a1`
+**Latest implementation SHA:** `3d6a847add226dc4524263be9ee59684af494e46`
 
 ## Dependency proof
 
@@ -15,7 +15,7 @@ W7 is authoritatively merged on `main` as `7a139d3a8efa5d587e4cb384d96abf54571d6
 - explicit ExperimentDesign with population/context/allocation/success metrics/guardrails;
 - sequential lifecycle from PROPOSED through PROMOTED with SIMULATED/REPLAYED branch;
 - W7 assurance-gated ASSURED transition;
-- explicit authority-bearing PromotionDecision;
+- explicit authority-bearing PromotionDecision and explicit assurance reference;
 - live-stage GuardrailTrigger and RollbackRecord;
 - deterministic lifecycle validation and serialization;
 - invariant tests.
@@ -44,4 +44,4 @@ Repository CI runs `python -m pytest`; local public GitHub DNS is unavailable in
 
 ## Architect disposition requested
 
-Review exact PR head `3711d763d72e88e49316b8baa2b5bbefb9ffd2a1`, verify CI, and merge only the reviewed head. After merge, W9 becomes eligible.
+Review exact PR head `3d6a847add226dc4524263be9ee59684af494e46`, verify CI, and merge only the reviewed head. After merge, W9 becomes eligible.
