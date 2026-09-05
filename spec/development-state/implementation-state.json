@@ -4,7 +4,7 @@
   "roadmap": "spec/implementation-roadmap.md",
   "status": "FROZEN_FOUNDATION",
   "tasks": {
-    "W0": {"status": "FOUNDATION_COMMITTED", "dependencies": [], "mergedAs": null},
+    "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "ELIGIBLE", "dependencies": ["W0"], "mergedAs": null},
     "W2": {"status": "BLOCKED", "dependencies": ["W1"], "mergedAs": null},
     "W3": {"status": "BLOCKED", "dependencies": ["W2"], "mergedAs": null},
@@ -24,8 +24,8 @@
   "currentFrontier": ["W1"],
   "currentTask": "W1",
   "notes": [
-    "Initial authority/architecture/roadmap foundation was created before feature implementation.",
-    "W0 is represented by the foundational repository commit and frozen governance artifacts; no implementation branch exists yet.",
-    "All later status must be reconciled from actual Git merge evidence."
+    "W0 is the one-time empty-repository bootstrap exception; later task completion follows normal Architect-gated merge semantics.",
+    "All later status must be reconciled from actual Git merge evidence.",
+    "Never treat this file's projections as stronger than Git history or frozen architecture."
   ]
 }
