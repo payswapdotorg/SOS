@@ -40,5 +40,6 @@ from .recovery import RecoveryFinding, RecoveryInventory, RecoveryReport, recove
 from .evidence import EvidenceKind, EvidenceMode, EvidenceRecord, EvidenceStore, TelemetryEventEnvelope, evidence_from_recovery, persist_records
 from .causal import ArchitectureMemory, ArchitectureMemoryStore, CausalHypothesis, HypothesisStatus, record_memory
 from .search import CandidateMetrics, CandidateState, RankedCandidates, SearchBudget, generate_candidates, pareto_front
+from .assurance import AssuranceCheck, AssurancePolicy, AssuranceResult, AssuranceVerdict, CheckKind, CheckState, ImpactAssessment, RiskAssessment, assure_candidate, export_assurance
 
 __all__ = [name for name in globals() if not name.startswith("_")]
