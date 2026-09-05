@@ -1,14 +1,16 @@
 # W1 Implementation Checkpoint
 
 **Work Order:** `W1 — Mission / Value / Context Model`
-**State:** `WAITING_FOR_ARCHITECT`
+**State:** `MERGED`
+**PR:** `#1`
 **Branch:** `work/w1-mission-value-context`
 **Base SHA:** `5ab20436555e4e41679ef4137c07f938ad1a4353`
-**Latest implementation SHA:** `00e67471855fbc0b4a3513ac3c20bee2036f3978`
+**Review head SHA:** `79d4ddb209b9fd96d19b09fa32c92b0af1fd3e35`
+**Merge SHA:** `091d4d10a38922fb2d9cadb103e7ba8caa7a1f20`
 
 ## Dependency proof
 
-W0 is authoritative on `main` through the existing bootstrap/reconciliation history. No unmerged sibling dependency is used.
+W0 is authoritative on `main` through the existing bootstrap/reconciliation history. W1 used no unmerged sibling dependency.
 
 ## Scope implemented
 
@@ -37,6 +39,8 @@ Result:
 8 passed in 0.11s
 ```
 
+GitHub status for the reviewed head had no status checks configured; local deterministic verification is the recorded test evidence.
+
 ## Requirement mapping
 
 | Requirement | Implementation / verification |
@@ -58,6 +62,6 @@ Result:
 - Calibration is represented as descriptive metadata; no calibration estimator exists in W1.
 - W1 intentionally contains no runtime observation, telemetry, architecture graph, candidate search, assurance or experiment execution.
 
-## Architect disposition requested
+## Reconciliation
 
-Review exact branch head and diff against the W1 Work Order. If all acceptance criteria and governing gates pass, merge this PR and perform canonical post-merge reconciliation. This checkpoint itself does not mark W1 complete.
+W1 is complete because the governing Architect gate passed, PR #1 was actually merged, and the canonical development state is updated to record the merge and next frontier. This file is historical evidence, not a successor authorization source.
