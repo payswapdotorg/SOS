@@ -2,13 +2,13 @@
   "schemaVersion": "1.0",
   "program": "SOS-v1",
   "roadmap": "spec/implementation-roadmap.md",
-  "status": "W3_DISPATCHED",
+  "status": "W4_DISPATCHED",
   "tasks": {
     "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
     "W2": {"status": "COMPLETE", "dependencies": ["W1"], "mergedAs": "587201d3e12a10ba9fac6da751d663a40c33dfb9"},
-    "W3": {"status": "DISPATCHED", "dependencies": ["W2"], "mergedAs": null},
-    "W4": {"status": "BLOCKED", "dependencies": ["W2"], "mergedAs": null},
+    "W3": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "6541441bb706ef1f27b2c38b9eb930433641b14b"},
+    "W4": {"status": "DISPATCHED", "dependencies": ["W2"], "mergedAs": null},
     "W5": {"status": "BLOCKED", "dependencies": ["W4"], "mergedAs": null},
     "W6": {"status": "BLOCKED", "dependencies": ["W3", "W5"], "mergedAs": null},
     "W7": {"status": "BLOCKED", "dependencies": ["W6"], "mergedAs": null},
@@ -21,13 +21,14 @@
     "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
     "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
   },
-  "currentFrontier": ["W3"],
-  "currentTask": "W3",
+  "currentFrontier": ["W4"],
+  "currentTask": "W4",
   "notes": [
     "W0 is the one-time empty-repository bootstrap exception; later task completion follows normal Architect-gated merge semantics.",
     "W1 completed via PR #1 after exact-head review and merge; reconciliation is based on merge SHA rather than the pre-merge branch head.",
     "W2 is authoritatively merged as 587201d3e12a10ba9fac6da751d663a40c33dfb9.",
-    "W3 is dispatched from the W2 boundary. W4 remains independently eligible by roadmap dependency but is not dispatched in this cycle.",
+    "W3 is authoritatively merged as 6541441bb706ef1f27b2c38b9eb930433641b14b after exact-head review, resolution of F01/F02, and successful CI.",
+    "W4 is dispatched after W3 completion; it depends authoritatively only on W2 and establishes the evidence/observability boundary.",
     "All later status must be reconciled from actual Git merge evidence.",
     "Never treat this file's projections as stronger than Git history or frozen architecture."
   ]
