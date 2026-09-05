@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from .evidence import EvidenceMode, EvidenceRecord, EvidenceKind
+from .evidence import EvidenceRecord
+from .graph import ArchitectureGraph
 from .search import CandidateState
 from .model import ModelValidationError, Traceability, TruthState
 
@@ -125,9 +126,7 @@ class AssuranceResult:
 
 
 def _evidence_supports_check(check: AssuranceCheck, evidence: Mapping[str, EvidenceRecord]) -> bool:
-    if check.state != CheckState.PASS:
-        return False
-    if not check.evidence_refs:
+    if check.state != CheckState.PASS or not check.evidence_refs:
         return False
     records = [evidence.get(ref) for ref in check.evidence_refs]
     return all(record is not None and record.result.state == TruthState.SUCCESS for record in records)
@@ -136,14 +135,15 @@ def _evidence_supports_check(check: AssuranceCheck, evidence: Mapping[str, Evide
 def assure_candidate(
     *,
     candidate: CandidateState,
+    graph: ArchitectureGraph,
     checks: Sequence[AssuranceCheck],
     impact: ImpactAssessment,
     risk: RiskAssessment,
     policy: AssurancePolicy,
     evidence: Mapping[str, EvidenceRecord],
 ) -> AssuranceResult:
-    """Evaluate assurance gates without mutating or promoting the candidate."""
-    candidate.validate(candidate.replacement_graph if hasattr(candidate, "replacement_graph") else _candidate_graph(candidate))
+    """Evaluate configured assurance gates without mutating or promoting the candidate."""
+    candidate.validate(graph)
     policy.validate()
     impact.validate()
     risk.validate()
@@ -168,16 +168,6 @@ def assure_candidate(
     result = AssuranceResult(candidate.id, candidate.base_system_state_ref, tuple(checks), impact, risk, verdict, tuple(reasons), candidate.traceability)
     result.validate(policy)
     return result
-
-
-def _candidate_graph(candidate: CandidateState):
-    """W6 replacement validation is normally performed before assurance."""
-    class _GraphProxy:
-        id = candidate.replacement.base_graph_ref
-        nodes = ()
-    # A real ArchitectureGraph is supplied by callers in normal use. This proxy
-    # is intentionally not used for graph semantics; W6 validation remains the gate.
-    return _GraphProxy()
 
 
 def export_assurance(result: AssuranceResult, path: str | Path) -> None:
