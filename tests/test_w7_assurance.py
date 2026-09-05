@@ -382,6 +382,180 @@ def test_reversibility_does_not_execute_rollback():
     assert not hasattr(result, "promotion")
 
 
+# --- SOS-W7-F01 regression: evidence/policy-backed reversibility ---
+
+
+def test_missing_rollback_and_containment_blocks_pass():
+    """SOS-W7-F01: when neither rollback evidence nor a documented containment
+    exception is supplied, the reversibility gate is BLOCKED and assurance cannot
+    PASS — regardless of how favorable the evidence/causal gates are."""
+    arch = graph()
+    ei = intervention_evidence()
+    support = EvidenceSupport(
+        evidence_id=ei.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-08T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-a", effect_subject="node-b",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="intervention increased latency", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "intervention-backed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    h = h.with_status("confirmed", known_evidence_ids={ei.id}, known_evidence_records={ei.id: ei})
+    c = candidate(e=ei, h=h)
+    # No rollback_evidence_ids and no containment_policy_ref supplied.
+    result = assure_candidate(candidate=c, base_graph=arch, known_evidence={ei.id: ei}, known_hypotheses={h.id: h})
+    rev_gate = next(g for g in result.gates if g.name == "reversibility-containment")
+    assert rev_gate.status == AssuranceStatus.BLOCKED
+    # Overall result must not be PASS when reversibility is BLOCKED.
+    assert result.status != AssuranceStatus.PASS
+
+
+def test_valid_documented_containment_exception_allows_reversibility_pass():
+    """SOS-W7-F01: a documented containment exception (caller-supplied reference)
+    is a governed alternative to rollback evidence and allows the reversibility
+    gate to PASS."""
+    arch = graph()
+    ei = intervention_evidence()
+    support = EvidenceSupport(
+        evidence_id=ei.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-08T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-a", effect_subject="node-b",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="intervention increased latency", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "intervention-backed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    h = h.with_status("confirmed", known_evidence_ids={ei.id}, known_evidence_records={ei.id: ei})
+    c = candidate(e=ei, h=h)
+    result = assure_candidate(
+        candidate=c, base_graph=arch, known_evidence={ei.id: ei}, known_hypotheses={h.id: h},
+        containment_policy_ref="governed-containment-exception-2026-001",
+    )
+    rev_gate = next(g for g in result.gates if g.name == "reversibility-containment")
+    assert rev_gate.status == AssuranceStatus.PASS
+    assert result.reversibility.containment_policy_ref == "governed-containment-exception-2026-001"
+
+
+def test_valid_rollback_evidence_allows_reversibility_pass():
+    """SOS-W7-F01: caller-supplied rollback evidence (a real W4 SUCCESS record)
+    allows the reversibility gate to PASS."""
+    arch = graph()
+    ei = intervention_evidence()
+    # A separate rollback-capability evidence record (kind=rollback, SUCCESS).
+    rollback_ev = StaticEvidenceAdapter.from_static_observation(
+        subject_ref="node-a", observation="rollback path verified",
+        result=TruthfulValue(TruthState.SUCCESS, "rollback-capable", None),
+        traceability=tr(), provenance=prov(subject="node-a"),
+    )
+    # The candidate references the intervention evidence as reasoning input.
+    support = EvidenceSupport(
+        evidence_id=ei.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-08T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-a", effect_subject="node-b",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="intervention increased latency", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "intervention-backed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    h = h.with_status("confirmed", known_evidence_ids={ei.id}, known_evidence_records={ei.id: ei})
+    c = candidate(e=ei, h=h)
+    known = {ei.id: ei, rollback_ev.id: rollback_ev}
+    result = assure_candidate(
+        candidate=c, base_graph=arch, known_evidence=known, known_hypotheses={h.id: h},
+        rollback_evidence_ids=(rollback_ev.id,),
+    )
+    rev_gate = next(g for g in result.gates if g.name == "reversibility-containment")
+    assert rev_gate.status == AssuranceStatus.PASS
+    assert rollback_ev.id in rev_gate.evidence_ids
+    assert result.reversibility.rollback_available is True
+
+
+def test_risk_name_substring_does_not_infer_rollback():
+    """SOS-W7-F01: a candidate whose risk string contains 'rollback' does NOT
+    by itself make rollback_available True — governance must be caller-supplied
+    and evidence/policy-backed, not inferred from a substring."""
+    arch = graph()
+    e = evidence()
+    h = hypothesis()
+    c = candidate(e=e, h=h)  # candidate.risks = ("rollback-risk",)
+    # No rollback_evidence_ids or containment_policy_ref supplied.
+    result = assure_candidate(candidate=c, base_graph=arch, known_evidence={e.id: e}, known_hypotheses={h.id: h})
+    # Despite the risk string containing 'rollback', rollback_available is False.
+    assert result.reversibility.rollback_available is False
+    rev_gate = next(g for g in result.gates if g.name == "reversibility-containment")
+    assert rev_gate.status == AssuranceStatus.BLOCKED
+
+
+# --- SOS-W7-F02 regression: causal gate evidence-traceable ---
+
+
+def test_causal_gate_evidence_ids_are_the_actual_intervention_records():
+    """SOS-W7-F02: the causal-qualification gate's evidence_ids must be the
+    exact intervention-grade support.evidence_id(s) used to establish PASS —
+    not the candidate's full reasoning_evidence_ids. This makes the gate's
+    justification auditable."""
+    arch = graph()
+    ei = intervention_evidence()  # the intervention-grade evidence
+    # A separate observational evidence also referenced by the candidate.
+    obs_ev = evidence(subject="node-a")
+    support = EvidenceSupport(
+        evidence_id=ei.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-08T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-a", effect_subject="node-b",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="intervention increased latency", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "intervention-backed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    h = h.with_status("confirmed", known_evidence_ids={ei.id}, known_evidence_records={ei.id: ei})
+    # Candidate references both the observational and the intervention evidence.
+    c = CandidateProposal(
+        id="", base_graph_ref="arch-1", base_graph_revision=REVISION,
+        mutation=SubgraphMutation(
+            kind=MutationKind.SUBGRAPH_REPLACE, base_graph_ref="arch-1",
+            target_node_ids=("node-a",), replacement_node_ids=("node-a-prime",),
+            boundary_interface_ids=("node-i",), invariants=("preserve-api", "stable-schema"),
+        ),
+        objectives=objectives(), rationale="reduce latency",
+        uncertainty=TruthfulValue(TruthState.UNKNOWN, None, "predicted not proven"),
+        reasoning_evidence_ids=(obs_ev.id, ei.id),  # both
+        reasoning_hypothesis_ids=(h.id,),
+        risks=(), traceability=tr(), provenance_revision=REVISION,
+    )
+    known = {obs_ev.id: obs_ev, ei.id: ei}
+    result = assure_candidate(
+        candidate=c, base_graph=arch, known_evidence=known, known_hypotheses={h.id: h},
+        containment_policy_ref="governed-containment-exception-2026-001",
+    )
+    causal_gate = next(g for g in result.gates if g.name == "causal-qualification")
+    assert causal_gate.status == AssuranceStatus.PASS
+    # The gate's evidence_ids must contain the actual intervention-grade record.
+    assert ei.id in causal_gate.evidence_ids
+    # The gate's evidence_ids must NOT include the observational evidence that
+    # was not used to establish the causal PASS.
+    assert obs_ev.id not in causal_gate.evidence_ids
+
+
 # --- C8: multi-objective integrity ---
 
 

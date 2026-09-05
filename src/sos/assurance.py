@@ -181,15 +181,29 @@ class ReversibilityAssessment:
 
     W7 records reversibility; it does NOT execute rollback (W8 owns the
     experiment/promotion/rollback lifecycle).
+
+    Per SOS-W7-F01: reversibility is truthfully evidence/policy-backed, not
+    inferred from a risk-name substring. ``rollback_evidence_ids`` references
+    the W4 evidence records that demonstrate rollback/recovery availability;
+    ``containment_policy_ref`` references a documented containment exception.
+    At least one of the two must be supplied for the gate to PASS.
     """
 
     rollback_available: bool
     detail: str
-    containment_policy: str | None = None
+    rollback_evidence_ids: tuple[str, ...] = ()
+    containment_policy_ref: str | None = None
 
     def __post_init__(self) -> None:
         if not self.detail.strip():
             raise ModelValidationError("ReversibilityAssessment.detail is required")
+        # SOS-W7-F01: rollback_available must be backed by evidence ids, not a
+        # substring inference. If rollback_available is True, evidence ids must
+        # be present.
+        if self.rollback_available and not self.rollback_evidence_ids:
+            raise ModelValidationError(
+                "ReversibilityAssessment.rollback_available=True requires rollback_evidence_ids"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +293,8 @@ def assure_candidate(
     known_evidence: dict[str, Evidence],
     known_hypotheses: dict[str, "CausalHypothesis"],
     hard_constraints: tuple[str, ...] = (),
+    rollback_evidence_ids: tuple[str, ...] = (),
+    containment_policy_ref: str | None = None,
 ) -> AssuranceResult:
     """Evaluate a W6 candidate and produce a structured, non-authorizing result.
 
@@ -344,10 +360,12 @@ def assure_candidate(
         detail=hard_detail,
     ))
 
-    # --- C6: causal qualification ---
+    # --- C6: causal qualification (F02: evidence-traceable to the actual intervention record) ---
+    # Collect the exact intervention-grade support evidence ids that establish
+    # the causal gate's PASS — not the candidate's full reasoning_evidence_ids.
+    causal_evidence_ids: list[str] = []
     causal_status = AssuranceStatus.UNKNOWN
     causal_detail = "no intervention-grade causal evidence"
-    has_intervention = False
     for hid in candidate.reasoning_hypothesis_ids:
         h = known_hypotheses.get(hid)
         if h is None:
@@ -356,30 +374,72 @@ def assure_candidate(
             if support.support_kind == SupportKind.INTERVENTION:
                 ev = known_evidence.get(support.evidence_id)
                 if ev is not None and ev.kind in _INTERVENTION_KINDS:
-                    has_intervention = True
-                    break
-        if has_intervention:
-            break
-    if has_intervention:
+                    # Record the EXACT intervention-grade support evidence id
+                    # used to establish this gate's status (SOS-W7-F02).
+                    if support.evidence_id not in causal_evidence_ids:
+                        causal_evidence_ids.append(support.evidence_id)
+    if causal_evidence_ids:
         causal_status = AssuranceStatus.PASS
-        causal_detail = "intervention-grade causal evidence present"
+        causal_detail = (
+            f"intervention-grade causal evidence present: {', '.join(causal_evidence_ids)}"
+        )
     else:
         causal_detail = "observational evidence only; causal efficacy not established"
     gates.append(AssuranceGate(
         name="causal-qualification",
         status=causal_status,
-        evidence_ids=tuple(candidate.reasoning_evidence_ids),
+        evidence_ids=tuple(causal_evidence_ids),  # F02: the actual supporting records
         detail=causal_detail,
     ))
 
-    # --- C7: reversibility / containment ---
-    rollback_available = bool(candidate.risks) and any("rollback" in r.lower() for r in candidate.risks)
+    # --- C7: reversibility / containment (F01: evidence/policy-backed, a gate) ---
+    # Per SOS-W7-F01: do NOT infer rollback availability from a risk-name
+    # substring. Reversibility is caller-supplied and validated: either
+    # rollback_evidence_ids (real W4 records) or a documented containment
+    # exception reference (containment_policy_ref). Assurance cannot PASS when
+    # neither is present.
+    rollback_available = bool(rollback_evidence_ids)
+    # Validate that rollback evidence records actually exist + are SUCCESS.
+    rev_status = AssuranceStatus.UNKNOWN
+    rev_detail = "no rollback/recovery evidence or documented containment exception supplied"
+    rev_evidence_ids: list[str] = []
+    if rollback_available:
+        for eid in rollback_evidence_ids:
+            ev = known_evidence.get(eid)
+            if ev is None:
+                rev_status = AssuranceStatus.BLOCKED
+                rev_detail = f"rollback evidence id '{eid}' not found in known_evidence"
+                rev_evidence_ids = []
+                break
+            rev_evidence_ids.append(eid)
+            if ev.result.state != TruthState.SUCCESS:
+                rev_status = AssuranceStatus.FAIL
+                rev_detail = f"rollback evidence '{eid}' observed state {ev.result.state.value}"
+        else:
+            if rev_status == AssuranceStatus.UNKNOWN:
+                rev_status = AssuranceStatus.PASS
+                rev_detail = f"rollback/recovery evidence present: {', '.join(rev_evidence_ids)}"
+    elif containment_policy_ref is not None and containment_policy_ref.strip():
+        # A documented containment exception is a governed alternative to rollback.
+        rev_status = AssuranceStatus.PASS
+        rev_detail = f"documented containment exception: {containment_policy_ref}"
+    else:
+        # SOS-W7-F01: neither rollback evidence nor a documented containment
+        # exception — assurance cannot PASS. This is a BLOCKED gate.
+        rev_status = AssuranceStatus.BLOCKED
+        rev_detail = "no rollback/recovery evidence and no documented containment exception"
     reversibility = ReversibilityAssessment(
         rollback_available=rollback_available,
-        detail="rollback evidence recorded; W8 owns rollback execution" if rollback_available
-        else "no rollback evidence recorded; containment policy applies",
-        containment_policy=None if rollback_available else "documented-containment-required",
+        detail=rev_detail,
+        rollback_evidence_ids=tuple(rev_evidence_ids),
+        containment_policy_ref=containment_policy_ref if (containment_policy_ref and containment_policy_ref.strip()) else None,
     )
+    gates.append(AssuranceGate(
+        name="reversibility-containment",
+        status=rev_status,
+        evidence_ids=tuple(rev_evidence_ids),
+        detail=rev_detail,
+    ))
 
     # --- C5: risk assessment ---
     risk_items: list[RiskItem] = []

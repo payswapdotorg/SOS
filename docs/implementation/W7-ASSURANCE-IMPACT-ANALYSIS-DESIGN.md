@@ -56,19 +56,32 @@ cannot be offset by objective improvements.
 is **never SUCCESS** — risk is inherently uncertain. Each item has a mitigation or
 residual note. `RiskAssessment` is a non-empty collection.
 
-## Causal qualification (C6)
+## Causal qualification (C6 — evidence-traceable, SOS-W7-F02)
 
 The causal-qualification gate checks whether any W5 hypothesis referenced by the
 candidate has intervention-grade support (W5 `SupportKind.INTERVENTION` backed by
-a W4 evidence record whose `EvidenceKind` is in `{EXPERIMENT, CANARY, SHADOW,
-REPLAY, SIMULATION}`). Observational evidence alone cannot PASS the causal gate —
-causal efficacy is never established from narrative or confidence.
+a W4 record whose `EvidenceKind` is in `{EXPERIMENT, CANARY, SHADOW, REPLAY,
+SIMULATION}`). Observational evidence alone cannot PASS the causal gate — causal
+efficacy is never established from narrative or confidence.
 
-## Reversibility / containment (C7)
+**SOS-W7-F02:** the gate's `evidence_ids` contains the **exact**
+`support.evidence_id` values used to establish PASS — not the candidate's full
+`reasoning_evidence_ids`. This makes the gate's justification auditable: the
+recorded evidence references are the actual supporting W4 intervention record(s).
 
-`ReversibilityAssessment` records whether rollback evidence exists (from the
-candidate's declared risks) or whether a documented containment policy applies.
+## Reversibility / containment (C7 — evidence/policy-backed, SOS-W7-F01)
+
+`ReversibilityAssessment` records whether governed rollback/recovery evidence
+exists (caller-supplied `rollback_evidence_ids`, real W4 records) or whether a
+documented containment exception applies (caller-supplied `containment_policy_ref`).
 W7 records reversibility; it does NOT execute rollback (W8 owns the lifecycle).
+
+**SOS-W7-F01:** reversibility is now an `AssuranceGate` ("reversibility-
+containment"): PASS only when rollback evidence is present + SUCCESS-validated,
+or a documented containment exception is supplied; BLOCKED when neither is
+present. Assurance cannot report PASS when the reversibility gate is BLOCKED.
+Governance is no longer inferred from a risk-name substring — it is caller-
+supplied and evidence/policy-backed.
 
 ## Multi-objective integrity (C8)
 
