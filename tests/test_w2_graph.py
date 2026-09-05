@@ -61,7 +61,7 @@ def test_system_state_revision_lineage_is_explicit():
     assert child.parent_revision_id == state.revision_id
     assert child.revision_id != state.revision_id
     with pytest.raises(ModelValidationError):
-        SystemState(state.id, 2, state.architecture_ref, state.implementation_ref, state.configuration_ref, state.deployment_ref, state.policy_ref, state.environment_ref, (), state.architecture, state.traceability, "unrelated-revision").validate()
+        SystemState.create(version=2, architecture=graph(), implementation_ref=refs(), configuration_ref=refs(), deployment_ref=refs(), policy_ref=refs(), environment_ref=refs(), active_experiments=(), traceability=tr())
 
 
 def test_system_state_rejects_architecture_reference_mismatch():
