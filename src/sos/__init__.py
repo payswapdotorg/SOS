@@ -10,6 +10,16 @@ from .graph import (
     SubgraphReplacement,
     SystemState,
 )
+from .recovery import (
+    FileClassification,
+    RecoveryResult,
+    RecoveredDependency,
+    RecoveredFile,
+    RepositoryInventory,
+    UnresolvedFact,
+    inventory_repository,
+    recover_repository,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,

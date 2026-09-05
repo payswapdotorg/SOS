@@ -1,0 +1,32 @@
+# Python build / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test / type-check caches
+.pytest_cache/
+.mypy_cache/
+.tox/
+.ruff_cache/
+
+# Node (not part of SOS; ignore stray sandbox artifacts)
+node_modules/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
