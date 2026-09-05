@@ -1,7 +1,7 @@
 # W2 Implementation Checkpoint
 
 **Work Order:** `W2 — System State + Architecture Graph`
-**State:** `COMPLETE`
+**State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w2-system-state-architecture-graph`
 **Base SHA:** `f9dc2e5746c227255d9583868bf04a23fceb0bc4`
 **Latest implementation SHA:** `73c8a1496a2a521b00eee72e772405f19748bc69`
@@ -45,11 +45,13 @@ Commands:
 python -m pytest
 ```
 
+The execution environment used for this architect session cannot resolve GitHub DNS, so local execution was unavailable. The workflow is configured to execute the full deterministic suite on push and pull request.
+
 ## Known limitations
 
 - JSON deserialization currently returns canonical dictionaries through the existing W1 persistence boundary rather than reconstructing typed Python objects.
 - SubgraphReplacement validates declarations against the base graph but does not mutate graphs or prove behavioral compatibility; those semantics belong to downstream candidate/assurance work orders.
 
-## Architect disposition
+## Architect disposition requested
 
-W2 remains the last accepted Worker implementation boundary. The repository was restored to the W2 tree after later unaccepted implementation work was removed from `main` via a rollback commit.
+Review the exact PR head and CI result against the W2 Work Order. On approval, merge the reviewed head and reconcile canonical state to W3/W4 eligibility as defined by the roadmap.
