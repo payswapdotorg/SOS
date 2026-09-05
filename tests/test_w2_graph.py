@@ -54,6 +54,16 @@ def test_system_state_contains_versioned_architecture_and_all_references():
     assert state.architecture_ref == arch.id and state.revision_id
 
 
+def test_system_state_revision_lineage_is_explicit():
+    state = SystemState.create(version=1, architecture=graph(), implementation_ref=refs(), configuration_ref=refs(), deployment_ref=refs(), policy_ref=refs(), environment_ref=refs(), active_experiments=(), traceability=tr())
+    child = state.next_revision(deployment_ref=refs())
+    assert child.version == 2
+    assert child.parent_revision_id == state.revision_id
+    assert child.revision_id != state.revision_id
+    with pytest.raises(ModelValidationError):
+        SystemState(state.id, 2, state.architecture_ref, state.implementation_ref, state.configuration_ref, state.deployment_ref, state.policy_ref, state.environment_ref, (), state.architecture, state.traceability, "unrelated-revision").validate()
+
+
 def test_system_state_rejects_architecture_reference_mismatch():
     arch = graph()
     state = SystemState.create(version=1, architecture=arch, implementation_ref=refs(), configuration_ref=refs(), deployment_ref=refs(), policy_ref=refs(), environment_ref=refs(), active_experiments=(), traceability=tr())
