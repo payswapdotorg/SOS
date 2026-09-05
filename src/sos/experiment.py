@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 from pathlib import Path
-from typing import Sequence
 
 from .assurance import AssuranceResult, AssuranceVerdict
 from .model import ModelValidationError, Traceability
@@ -34,14 +33,6 @@ LIVE_STAGES = {
     ExperimentStage.CANARY,
     ExperimentStage.EXPERIMENTAL,
     ExperimentStage.PROMOTED,
-}
-PRE_LIVE_STAGES = {
-    ExperimentStage.PROPOSED,
-    ExperimentStage.ANALYZED,
-    ExperimentStage.ASSURED,
-    ExperimentStage.TESTED,
-    ExperimentStage.SIMULATED,
-    ExperimentStage.REPLAYED,
 }
 
 
@@ -118,7 +109,7 @@ class Experiment:
         self.design.validate()
         self.traceability.validate(require_value=True, require_context=True)
         if self.current_stage == ExperimentStage.ASSURED and not self.assurance_ref:
-            raise ModelValidationError("ASSURED stage requires assurance reference")
+            raise ModelValidationError("ASSURED stage requires explicit assurance reference")
         if self.current_stage == ExperimentStage.PROMOTED and self.promotion is None:
             raise ModelValidationError("PROMOTED stage requires promotion decision")
         if self.current_stage == ExperimentStage.ROLLBACK and self.rollback is None:
@@ -165,32 +156,35 @@ def advance(
     target: ExperimentStage,
     transition_revision: str,
     assurance: AssuranceResult | None = None,
+    assurance_ref: str | None = None,
     promotion: PromotionDecision | None = None,
 ) -> Experiment:
-    """Advance one legal lifecycle step; downstream execution is deliberately absent."""
+    """Advance one legal lifecycle step; execution side effects are absent."""
     experiment.validate()
     if target == ExperimentStage.ROLLBACK:
         raise ModelValidationError("Use rollback() with a guardrail trigger for rollback transitions")
     if target not in _ALLOWED_NEXT[experiment.current_stage]:
         raise ModelValidationError(f"Illegal experiment transition: {experiment.current_stage.value} -> {target.value}")
 
-    assurance_ref = experiment.assurance_ref
+    next_assurance_ref = experiment.assurance_ref
     if target == ExperimentStage.ASSURED:
         if assurance is None or assurance.verdict != AssuranceVerdict.PASS:
             raise ModelValidationError("ASSURED requires a passing W7 AssuranceResult")
-        assurance_ref = assurance.candidate_ref
+        if not assurance_ref:
+            raise ModelValidationError("ASSURED requires an explicit assurance reference")
+        next_assurance_ref = assurance_ref
 
     if target == ExperimentStage.PROMOTED:
         if promotion is None:
             raise ModelValidationError("PROMOTED requires explicit PromotionDecision")
-        if assurance is not None and assurance.verdict != AssuranceVerdict.PASS:
-            raise ModelValidationError("Promotion cannot rely on a failed assurance result")
+        if promotion.assurance_ref != experiment.assurance_ref:
+            raise ModelValidationError("Promotion assurance reference must match the experiment assurance reference")
         if not experiment.assurance_ref:
             raise ModelValidationError("Promotion requires an assurance reference")
 
     updated = Experiment(
         experiment.id, experiment.candidate_ref, experiment.base_system_state_ref, experiment.design,
-        target, assurance_ref, promotion if target == ExperimentStage.PROMOTED else experiment.promotion,
+        target, next_assurance_ref, promotion if target == ExperimentStage.PROMOTED else experiment.promotion,
         experiment.rollback, experiment.traceability, transition_revision,
     )
     updated.validate()
@@ -222,13 +216,16 @@ def rollback(
 def promotion_from_assurance(
     assurance: AssuranceResult,
     *,
+    assurance_ref: str,
     authority_ref: str,
     authority_evidence_ref: str,
     decision_revision: str,
 ) -> PromotionDecision:
     if assurance.verdict != AssuranceVerdict.PASS:
         raise ModelValidationError("PromotionDecision requires passing assurance")
-    decision = PromotionDecision(authority_ref, authority_evidence_ref, assurance.candidate_ref, decision_revision)
+    if not assurance_ref:
+        raise ModelValidationError("assurance_ref is required")
+    decision = PromotionDecision(authority_ref, authority_evidence_ref, assurance_ref, decision_revision)
     decision.validate()
     return decision
 
