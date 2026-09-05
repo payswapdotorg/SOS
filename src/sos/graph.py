@@ -157,28 +157,53 @@ class SystemState:
             raise ModelValidationError("SystemState requires id, version and revision_id")
         if not self.architecture_ref or self.architecture.id != self.architecture_ref:
             raise ModelValidationError("SystemState architecture_ref must match attached ArchitectureGraph")
+        if self.version > 1 and not self.parent_revision_id:
+            raise ModelValidationError("Versioned SystemState revisions require parent_revision_id")
         self.traceability.validate(require_value=True, require_context=True)
         for reference in (self.implementation_ref, self.configuration_ref, self.deployment_ref, self.policy_ref, self.environment_ref):
             reference.validate()
         self.architecture.validate()
 
     @classmethod
-    def create(
-        cls, *, version: int, architecture: ArchitectureGraph,
-        implementation_ref: StateReference, configuration_ref: StateReference,
-        deployment_ref: StateReference, policy_ref: StateReference,
-        environment_ref: StateReference, active_experiments: tuple[str, ...],
-        traceability: Traceability, parent_revision_id: str | None = None,
-    ) -> "SystemState":
-        state = cls(
-            id=f"system-state-{uuid4()}", version=version, architecture_ref=architecture.id,
-            implementation_ref=implementation_ref, configuration_ref=configuration_ref,
-            deployment_ref=deployment_ref, policy_ref=policy_ref, environment_ref=environment_ref,
-            active_experiments=active_experiments, architecture=architecture,
-            traceability=traceability, revision_id=str(uuid4()), parent_revision_id=parent_revision_id,
-        )
+    def create(cls, *, version: int, architecture: ArchitectureGraph, implementation_ref: StateReference,
+               configuration_ref: StateReference, deployment_ref: StateReference, policy_ref: StateReference,
+               environment_ref: StateReference, active_experiments: tuple[str, ...], traceability: Traceability,
+               parent_revision_id: str | None = None) -> "SystemState":
+        state = cls(id=f"system-state-{uuid4()}", version=version, architecture_ref=architecture.id,
+                    implementation_ref=implementation_ref, configuration_ref=configuration_ref,
+                    deployment_ref=deployment_ref, policy_ref=policy_ref, environment_ref=environment_ref,
+                    active_experiments=active_experiments, architecture=architecture, traceability=traceability,
+                    revision_id=str(uuid4()), parent_revision_id=parent_revision_id)
         state.validate()
         return state
+
+    def next_revision(self, **changes: Any) -> "SystemState":
+        """Create an immutable child revision with an explicit parent revision."""
+        allowed = {
+            "architecture", "implementation_ref", "configuration_ref", "deployment_ref",
+            "policy_ref", "environment_ref", "active_experiments", "traceability",
+        }
+        unexpected = set(changes) - allowed
+        if unexpected:
+            raise ModelValidationError(f"Unsupported SystemState revision fields: {sorted(unexpected)}")
+        values = {
+            "id": self.id,
+            "version": self.version + 1,
+            "architecture_ref": changes.get("architecture", self.architecture).id,
+            "implementation_ref": changes.get("implementation_ref", self.implementation_ref),
+            "configuration_ref": changes.get("configuration_ref", self.configuration_ref),
+            "deployment_ref": changes.get("deployment_ref", self.deployment_ref),
+            "policy_ref": changes.get("policy_ref", self.policy_ref),
+            "environment_ref": changes.get("environment_ref", self.environment_ref),
+            "active_experiments": changes.get("active_experiments", self.active_experiments),
+            "architecture": changes.get("architecture", self.architecture),
+            "traceability": changes.get("traceability", self.traceability),
+            "revision_id": str(uuid4()),
+            "parent_revision_id": self.revision_id,
+        }
+        child = SystemState(**values)
+        child.validate()
+        return child
 
 
 @dataclass(frozen=True)
