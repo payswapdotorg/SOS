@@ -87,8 +87,8 @@ def _dominates(left: CandidateState, right: CandidateState) -> bool:
     a, b = left.metrics, right.metrics
     values_a = (a.benefit, a.cost, a.risk, a.uncertainty, -a.reversibility, a.blast_radius, -a.memory_prior)
     values_b = (b.benefit, b.cost, b.risk, b.uncertainty, -b.reversibility, b.blast_radius, -b.memory_prior)
-    no_worse = all(x >= y if idx in (0,) else x <= y for idx, (x, y) in enumerate(zip(values_a, values_b)))
-    strictly_better = any(x > y if idx in (0,) else x < y for idx, (x, y) in enumerate(zip(values_a, values_b)))
+    no_worse = all(x >= y if idx == 0 else x <= y for idx, (x, y) in enumerate(zip(values_a, values_b)))
+    strictly_better = any(x > y if idx == 0 else x < y for idx, (x, y) in enumerate(zip(values_a, values_b)))
     return no_worse and strictly_better
 
 
@@ -102,10 +102,12 @@ def pareto_front(candidates: Sequence[CandidateState]) -> tuple[CandidateState, 
 def _candidate_id(replacement: SubgraphReplacement, metrics: CandidateMetrics) -> str:
     material = "|".join(
         [
+            replacement.id,
             replacement.base_graph_ref,
             ",".join(replacement.target_node_ids),
             ",".join(replacement.replacement_node_ids),
             ",".join(replacement.boundary_interface_ids),
+            ",".join(replacement.invariants),
             repr((metrics.benefit, metrics.cost, metrics.risk, metrics.uncertainty, metrics.reversibility, metrics.blast_radius, metrics.memory_prior)),
         ]
     )
@@ -146,6 +148,10 @@ def generate_candidates(
     if not replacement_list or not metric_list:
         raise ModelValidationError("At least one replacement and metric set are required")
     candidates: list[CandidateState] = []
+    predicted = tuple(predicted_effects)
+    risk_notes = tuple(risks)
+    if not predicted or not risk_notes:
+        raise ModelValidationError("predicted_effects and risks must each contain at least one item")
     for replacement in replacement_list:
         replacement.validate(graph)
         prior, refs = _prior_for(replacement, memories)
@@ -163,8 +169,8 @@ def generate_candidates(
                 id=_candidate_id(replacement, metric),
                 base_system_state_ref=base_system_state_ref,
                 replacement=replacement,
-                predicted_effects=tuple(predicted_effects),
-                risks=tuple(risks),
+                predicted_effects=predicted,
+                risks=risk_notes,
                 authority_required=authority_required,
                 metrics=metric,
                 traceability=traceability,
@@ -177,7 +183,7 @@ def generate_candidates(
         if len(candidates) >= budget.max_candidates:
             break
 
-    # Deterministic candidate ordering. Memory prior is only a tie-break/input signal.
+    # Deterministic candidate ordering. Memory prior is a bounded prior/tie-break signal, not authorization.
     ordered = tuple(sorted(candidates, key=lambda c: (
         -c.metrics.benefit,
         c.metrics.cost,
