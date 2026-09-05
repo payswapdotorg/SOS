@@ -4,7 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w9-autonomy-authority`
 **Base SHA:** `a33937d38af8dc42055c7b08c0642778977d4343`
-**Latest implementation SHA:** `94d646a723575a16d884f8ebd4b67a5be518391a`
+**Latest implementation SHA:** `4f50e0c6f27d4ca121e485b0f0c08bb04d6b0a59`
 
 ## Dependency proof
 
@@ -17,6 +17,7 @@ W7 merged as `7a139d3a8efa5d587e4cb384d96abf54571d64b9`; W8 merged as `79da7d0b8
 - bounded evaluator routing insufficient authority to ASK;
 - explicit GATHER_EVIDENCE path when the grant allows it;
 - complete ASK payload;
+- explicit max-impact authority boundary;
 - append-only AuthorityLedger and deterministic export;
 - W1 AutonomyPolicy preserved as a lower-level policy primitive; no second semantic authority.
 
@@ -45,4 +46,4 @@ Repository CI runs `python -m pytest`; local public GitHub DNS is unavailable, s
 
 ## Architect disposition requested
 
-Review exact PR head and merge only the reviewed head. After merge, W10 and W11 become independently eligible by roadmap dependency structure.
+Review exact PR head `4f50e0c6f27d4ca121e485b0f0c08bb04d6b0a59` and merge only the reviewed head. After merge, W10 and W11 become independently eligible by roadmap dependency structure.
