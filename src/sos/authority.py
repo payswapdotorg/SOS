@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Sequence
 
-from .model import ModelValidationError, Traceability, TruthState
+from .model import ModelValidationError, Traceability
 
 
 class AuthorityAction(str, Enum):
@@ -33,6 +33,7 @@ class AuthorityGrant:
     environment: str
     min_confidence: float
     max_risk: float
+    max_impact: float
     max_blast_radius: float
     require_reversible: bool
     allow_gather_evidence: bool
@@ -50,6 +51,7 @@ class AuthorityGrant:
         for name, value in (
             ("min_confidence", self.min_confidence),
             ("max_risk", self.max_risk),
+            ("max_impact", self.max_impact),
             ("max_blast_radius", self.max_blast_radius),
             ("gather_min_confidence", self.gather_min_confidence),
             ("gather_max_risk", self.gather_max_risk),
@@ -207,8 +209,8 @@ def evaluate(request: DecisionRequest, grants: Sequence[AuthorityGrant]) -> Auth
         return _ask(request, None, "no authority grant covers this action/environment", ("authorize", "do not authorize"))
     if grant.require_human_approval:
         return _ask(request, grant, "grant requires human approval", ("approve", "reject"))
-    if request.risk > grant.max_risk or request.blast_radius > grant.max_blast_radius:
-        return _ask(request, grant, "requested action exceeds granted risk or blast-radius boundary", ("accept risk", "choose safer alternative"))
+    if request.risk > grant.max_risk or request.impact > grant.max_impact or request.blast_radius > grant.max_blast_radius:
+        return _ask(request, grant, "requested action exceeds granted risk, impact, or blast-radius boundary", ("accept risk", "choose safer alternative"))
     if grant.require_reversible and not request.reversible:
         return _ask(request, grant, "granted action requires reversibility", ("approve exception", "choose reversible alternative"))
     evidence_ok = _quality_score(request.evidence_quality) >= grant.min_confidence
