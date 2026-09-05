@@ -2,15 +2,15 @@
   "schemaVersion": "1.0",
   "program": "SOS-v1",
   "roadmap": "spec/implementation-roadmap.md",
-  "status": "W4_COMPLETE",
+  "status": "W5_COMPLETE",
   "tasks": {
     "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
     "W2": {"status": "COMPLETE", "dependencies": ["W1"], "mergedAs": "587201d3e12a10ba9fac6da751d663a40c33dfb9"},
     "W3": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "713264759bc804e0cfec0f36e06801e3338e98f4"},
     "W4": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "d2f60bd6c0181ee19ecbd103ff4ba3cb2ff7fc8c"},
-    "W5": {"status": "ELIGIBLE", "dependencies": ["W4"], "mergedAs": null},
-    "W6": {"status": "BLOCKED", "dependencies": ["W3", "W5"], "mergedAs": null},
+    "W5": {"status": "COMPLETE", "dependencies": ["W4"], "mergedAs": "3de7eaa1def540a033612e7bfd1db673c1456fa8"},
+    "W6": {"status": "ELIGIBLE", "dependencies": ["W3", "W5"], "mergedAs": null},
     "W7": {"status": "BLOCKED", "dependencies": ["W6"], "mergedAs": null},
     "W8": {"status": "BLOCKED", "dependencies": ["W7"], "mergedAs": null},
     "W9": {"status": "BLOCKED", "dependencies": ["W7", "W8"], "mergedAs": null},
@@ -21,12 +21,12 @@
     "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
     "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
   },
-  "currentFrontier": ["W5"],
-  "currentTask": "W5",
+  "currentFrontier": ["W6"],
+  "currentTask": "W6",
   "notes": [
     "W0 is the one-time empty-repository bootstrap exception; later task completion follows normal Architect-gated merge semantics.",
-    "W1 through W4 completed through reviewed PR merges; reconciliation is based on merge SHAs.",
-    "W5 is now eligible because W4 is authoritatively merged.",
+    "W1 through W5 completed through reviewed PR merges; reconciliation is based on merge SHAs.",
+    "W6 is eligible because W3 and W5 are authoritatively merged.",
     "All later status must be reconciled from actual Git merge evidence.",
     "Never treat this file's projections as stronger than Git history or frozen architecture."
   ]
