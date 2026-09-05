@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "program": "SOS-v1",
   "roadmap": "spec/implementation-roadmap.md",
-  "status": "W6_DISPATCHED",
+  "status": "W7_DISPATCHED",
   "tasks": {
     "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
@@ -10,8 +10,8 @@
     "W3": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "6541441bb706ef1f27b2c38b9eb930433641b14b"},
     "W4": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "26060db57c24ba8b36315c1005466046810c5163"},
     "W5": {"status": "COMPLETE", "dependencies": ["W4"], "mergedAs": "2bfd0f89da129c6b3347d88b0d8da1b79dd04127"},
-    "W6": {"status": "DISPATCHED", "dependencies": ["W3", "W5"], "mergedAs": null},
-    "W7": {"status": "BLOCKED", "dependencies": ["W6"], "mergedAs": null},
+    "W6": {"status": "COMPLETE", "dependencies": ["W3", "W5"], "mergedAs": "b5171f70ca5ce85ca0be07cfdb3abf034c03c32f"},
+    "W7": {"status": "DISPATCHED", "dependencies": ["W6"], "mergedAs": null},
     "W8": {"status": "BLOCKED", "dependencies": ["W7"], "mergedAs": null},
     "W9": {"status": "BLOCKED", "dependencies": ["W7", "W8"], "mergedAs": null},
     "W10": {"status": "BLOCKED", "dependencies": ["W2", "W9"], "mergedAs": null},
@@ -21,8 +21,8 @@
     "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
     "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
   },
-  "currentFrontier": ["W6"],
-  "currentTask": "W6",
+  "currentFrontier": ["W7"],
+  "currentTask": "W7",
   "notes": [
     "W0 is the one-time empty-repository bootstrap exception; later task completion follows normal Architect-gated merge semantics.",
     "W1 completed via PR #1 after exact-head review and merge; reconciliation is based on merge SHA rather than the pre-merge branch head.",
@@ -30,7 +30,8 @@
     "W3 is authoritatively merged as 6541441bb706ef1f27b2c38b9eb930433641b14b after exact-head review, resolution of F01/F02, and successful CI.",
     "W4 is authoritatively merged as 26060db57c24ba8b36315c1005466046810c5163 after exact-head review, resolution of SOS-W4-F01, and successful exact-head CI run #123.",
     "W5 is authoritatively merged as 2bfd0f89da129c6b3347d88b0d8da1b79dd04127 after exact-head review, resolution of SOS-W5-F01, and successful exact-head CI run #131.",
-    "W6 is dispatched after W3 and W5 completion; it establishes bounded candidate generation/search with explicit multi-objective and non-authorizing semantics.",
+    "W6 is authoritatively merged as b5171f70ca5ce85ca0be07cfdb3abf034c03c32f after exact-head review, resolution of SOS-W6-F01, and successful exact-head CI run #139.",
+    "W7 is dispatched only after the actual W6 merge was verified on main; its Work Order is spec/work-orders/W7-assurance-impact-analysis.md.",
     "All later status must be reconciled from actual Git merge evidence.",
     "Never treat this file's projections as stronger than Git history or frozen architecture."
   ]
