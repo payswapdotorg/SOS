@@ -38,5 +38,6 @@ from .model import (
 )
 from .recovery import RecoveryFinding, RecoveryInventory, RecoveryReport, recover_repository
 from .evidence import EvidenceKind, EvidenceMode, EvidenceRecord, EvidenceStore, TelemetryEventEnvelope, evidence_from_recovery, persist_records
+from .causal import ArchitectureMemory, ArchitectureMemoryStore, CausalHypothesis, HypothesisStatus, record_memory
 
 __all__ = [name for name in globals() if not name.startswith("_")]
