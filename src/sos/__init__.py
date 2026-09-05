@@ -49,6 +49,17 @@ from .candidates import (
     SearchEngine,
     SubgraphMutation,
 )
+from .assurance import (
+    AssuranceGate,
+    AssuranceResult,
+    AssuranceStatus,
+    BlastRadius,
+    ImpactAnalysis,
+    RiskAssessment,
+    RiskItem,
+    ReversibilityAssessment,
+    assure_candidate,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
