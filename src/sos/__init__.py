@@ -37,6 +37,18 @@ from .causal import (
     InterventionMetadata,
     SupportKind,
 )
+from .candidates import (
+    CandidateEvaluation,
+    CandidateObjective,
+    CandidateProposal,
+    CandidateSpace,
+    MutationKind,
+    ObjectiveDirection,
+    ParetoFrontier,
+    SearchBounds,
+    SearchEngine,
+    SubgraphMutation,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
