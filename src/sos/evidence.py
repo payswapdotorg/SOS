@@ -160,7 +160,12 @@ def _evidence_id(
     result: TruthfulValue[Any],
     provenance: EvidenceProvenance,
 ) -> str:
-    """Content-addressed identity: identical evidence ⇒ identical id (criterion 6)."""
+    """Content-addressed identity: identical evidence ⇒ identical id (criterion 6).
+
+    The identity material spans the full provenance contract — including
+    ``provenance.environment`` — so two observations that differ only by
+    environment receive distinct ids and are NOT incorrectly deduplicated.
+    """
     material = "|".join(
         [
             kind.value,
@@ -173,6 +178,7 @@ def _evidence_id(
             provenance.observed_subject,
             provenance.timestamp or "",
             provenance.implementation_revision or "",
+            provenance.environment or "",
         ]
     )
     digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]

@@ -50,12 +50,12 @@ def tr() -> Traceability:
     )
 
 
-def prov(*, source: str = "static-recovery", subject: str = "system-state-1", revision: str = REVISION) -> EvidenceProvenance:
+def prov(*, source: str = "static-recovery", subject: str = "system-state-1", revision: str = REVISION, environment: str = "production") -> EvidenceProvenance:
     return EvidenceProvenance(
         source=source,
         observed_subject=subject,
         timestamp="2026-09-05T12:00:00Z",
-        environment="production",
+        environment=environment,
         implementation_revision=revision,
     )
 
@@ -122,6 +122,59 @@ def test_identical_evidence_inputs_produce_identical_identity():
         traceability=tr(), provenance=prov(),
     )
     assert a.id == b.id
+
+
+def test_environment_distinctness_changes_evidence_identity():
+    """SOS-W4-F01 regression: two observations that differ only by environment
+    MUST receive distinct content-addressed ids and MUST NOT be incorrectly
+    deduplicated by EvidenceGraph.ingest.
+
+    The W4 identity contract spans the full provenance (including
+    ``provenance.environment``); the identity material must not omit it.
+    """
+    e_prod = StaticEvidenceAdapter.from_test_result(
+        subject_ref="node-1", test_name="tests/test_app.py::test_main",
+        result=TruthfulValue(TruthState.SUCCESS, "pass", None),
+        traceability=tr(), provenance=prov(environment="production"),
+    )
+    e_staging = StaticEvidenceAdapter.from_test_result(
+        subject_ref="node-1", test_name="tests/test_app.py::test_main",
+        result=TruthfulValue(TruthState.SUCCESS, "pass", None),
+        traceability=tr(), provenance=prov(environment="staging"),
+    )
+    assert e_prod.id != e_staging.id, (
+        "evidence differing only by environment must not share an identity"
+    )
+
+    # And the two must NOT be deduplicated into one record on ingestion.
+    g = EvidenceGraph(id="eg-env", version=1, records=(), traceability=tr())
+    g = g.ingest(e_prod).ingest(e_staging)
+    assert len(g.records) == 2, "distinct-environment evidence must not deduplicate"
+    g.validate()
+    assert {e_prod.id, e_staging.id} == {r.id for r in g.records}
+
+
+def test_environment_none_is_distinct_from_named_environment():
+    """An observation with environment=None must also get its own identity,
+    distinct from the same observation with a named environment — proving the
+    identity material treats environment truthfully (None is a real value)."""
+    from sos.evidence import EvidenceProvenance
+    e_named = StaticEvidenceAdapter.from_test_result(
+        subject_ref="node-1", test_name="tests/test_app.py::test_main",
+        result=TruthfulValue(TruthState.SUCCESS, "pass", None),
+        traceability=tr(), provenance=prov(environment="production"),
+    )
+    e_none = StaticEvidenceAdapter.from_test_result(
+        subject_ref="node-1", test_name="tests/test_app.py::test_main",
+        result=TruthfulValue(TruthState.SUCCESS, "pass", None),
+        traceability=tr(),
+        provenance=EvidenceProvenance(
+            source="static-recovery", observed_subject="system-state-1",
+            timestamp="2026-09-05T12:00:00Z", environment=None,
+            implementation_revision=REVISION,
+        ),
+    )
+    assert e_named.id != e_none.id
 
 
 # --- acceptance criterion 2: subject linkage without semantic authority change ---
