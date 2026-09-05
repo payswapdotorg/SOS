@@ -4,6 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w3-architecture-recovery`
 **Base SHA:** `801754ab4dcbf5627f68ca65ad7d28973f1aa9de`
+**Latest implementation SHA:** `63de2a3d82f20efb35dfe7508f0d1e4a7cf39b1f`
 
 ## Dependency proof
 
@@ -27,23 +28,23 @@ No runtime observation, telemetry ingestion, causal inference, architecture memo
 
 | Requirement | Implementation / verification |
 |---|---|
-| R6 | `recover_repository()` accepts a supplied existing repository root and recovers static structure into W2 state. |
+| R6 | `recover_repository()` accepts an existing repository root and recovers static structure into W2 state. |
 | R7 | Recovered `SystemState` contains implementation/configuration/deployment/policy/environment references and recovered architecture. |
-| R8 | Recovery populates W2 typed graph semantics; it does not rewrite architecture authority. |
-| R21 | Runtime deployment/environment remain `UNAVAILABLE`; inference does not collapse missing facts into success. |
-| R23 | Recovered facts retain source-path and repository-revision provenance plus uncertainty. |
-| R24 | Work Order, design, checkpoint and tests are repository-resident. |
+| R8 | Recovery populates W2 typed graph semantics without rewriting architecture authority. |
+| R21 | Runtime deployment/environment remain `UNAVAILABLE`; missing live facts are not synthesized. |
+| R23 | Recovered nodes and edges retain source-path/revision provenance and explicit uncertainty. |
+| R24 | Work Order, design, checkpoint, implementation and tests are repository-resident. |
 
 ## Verification
 
-The repository already contains the W2 `.github/workflows/test.yml` pytest workflow. This execution environment cannot access GitHub Actions logs directly and cannot resolve public GitHub DNS, so no local test claim is being fabricated. The W3 tests are deterministic and are configured for the repository CI workflow.
+The repository's W2 `.github/workflows/test.yml` workflow runs `python -m pytest` on push and pull request. Public GitHub DNS is unavailable in this execution environment, so no local pass count is asserted. The W3 test suite is deterministic and covers inventory ordering, repository-local import extraction, provenance, unavailable runtime facts and invalid roots.
 
 ## Known limitations
 
-- Static dependency extraction currently targets Python imports whose module paths resolve directly from the repository root; projects with additional source roots may yield conservative omissions rather than false dependencies.
-- JSON persistence remains the W1 canonical dictionary wire format rather than typed-object deserialization.
-- Static recovery cannot establish live runtime state, which remains explicitly unavailable until W4.
+- Python dependency extraction intentionally resolves only repository-root module paths; projects using extra source roots are conservatively incomplete rather than falsely connected.
+- JSON persistence remains the W1 dictionary wire format.
+- Static recovery cannot establish live runtime state; W4 remains responsible for runtime/evidence ingestion.
 
 ## Architect disposition requested
 
-Review the exact PR head against W3 scope and frozen architecture. On approval, merge the reviewed head and reconcile W3 completion. W4 remains independently eligible because both W3 and W4 depend only on W2.
+Review the exact PR head against W3 scope and frozen architecture. On approval, merge the reviewed head and reconcile W3 completion. W4 remains independently eligible because it depends only on W2.
