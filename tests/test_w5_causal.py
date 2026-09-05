@@ -493,6 +493,11 @@ def test_hypothesis_status_transitions_are_explicit():
     h_promoted = h.with_status("supported", known_evidence_ids={e.id})
     assert h_promoted.status == "supported"
     # Cannot transition to 'confirmed' (a certainty state) from observation-only support.
+    # Even with known_evidence_records supplied, the confirmed gate requires
+    # intervention-grade support — which observational evidence cannot provide.
+    with pytest.raises(ModelValidationError):
+        h.with_status("confirmed", known_evidence_ids={e.id}, known_evidence_records={e.id: e})
+    # And confirmed is refused entirely without known_evidence_records (SOS-W5-F01).
     with pytest.raises(ModelValidationError):
         h.with_status("confirmed", known_evidence_ids={e.id})
 
@@ -513,5 +518,105 @@ def test_intervention_backed_hypothesis_can_reach_confirmed():
         uncertainty=TruthfulValue(TruthState.SUCCESS, "intervention-backed", None),
         supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
     )
-    h_confirmed = h.with_status("confirmed", known_evidence_ids={e.id})
+    # confirmed now requires known_evidence_records to verify intervention-grade
+    # support against the actual W4 evidence record (SOS-W5-F01).
+    h_confirmed = h.with_status(
+        "confirmed", known_evidence_ids={e.id}, known_evidence_records={e.id: e},
+    )
     assert h_confirmed.status == "confirmed"
+
+
+# --- SOS-W5-F01 regression: evidence-backed observation vs intervention ---
+
+
+def test_observational_evidence_rejected_as_intervention_with_evidence_map():
+    """SOS-W5-F01: an actual W4 observational evidence record (kind=OBSERVATION)
+    cannot back INTERVENTION support, even when InterventionMetadata is supplied.
+    The evidence-backed validation resolves the W4 record and rejects it."""
+    e = evidence()  # kind=OBSERVATION
+    support = EvidenceSupport(
+        evidence_id=e.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="fake-experiment", intervention_kind="experiment",
+            applied_at="2026-09-06T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-1", effect_subject="node-2",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="relabeled observation", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "claimed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    with pytest.raises(ModelValidationError, match="intervention-grade W4 evidence"):
+        h.validate(known_evidence_records={e.id: e})
+
+
+def test_intervention_grade_evidence_accepted_as_intervention_with_evidence_map():
+    """SOS-W5-F01: an actual intervention-grade W4 evidence record (kind=EXPERIMENT)
+    with consistent InterventionMetadata passes evidence-backed validation."""
+    e = intervention_evidence()  # kind=EXPERIMENT
+    support = EvidenceSupport(
+        evidence_id=e.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-06T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-1", effect_subject="node-2",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="intervention increased latency", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "intervention-backed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    h.validate(known_evidence_records={e.id: e})  # must not raise
+
+
+def test_intervention_metadata_provenance_mismatch_rejected():
+    """SOS-W5-F01: InterventionMetadata whose revision/environment does not match
+    the W4 evidence's provenance is rejected (prevents fabricated metadata)."""
+    e = intervention_evidence()  # provenance: revision=REVISION, environment="production"
+    support = EvidenceSupport(
+        evidence_id=e.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="experiment-42", intervention_kind="experiment",
+            applied_at="2026-09-06T12:00:00Z",
+            revision="WRONG-REVISION",  # mismatch
+            environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-1", effect_subject="node-2",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="r", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "claimed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    with pytest.raises(ModelValidationError, match="does not match"):
+        h.validate(known_evidence_records={e.id: e})
+
+
+def test_confirmed_gate_rejects_observational_evidence_relabelled_as_intervention():
+    """SOS-W5-F01: the confirmed gate rejects observational evidence relabeled as
+    INTERVENTION, even when InterventionMetadata is supplied. This is the core
+    C3 enforcement the Architect identified as missing in iteration 1."""
+    e = evidence()  # kind=OBSERVATION
+    support = EvidenceSupport(
+        evidence_id=e.id, support_kind=SupportKind.INTERVENTION,
+        intervention=InterventionMetadata(
+            intervention_id="fake-experiment", intervention_kind="experiment",
+            applied_at="2026-09-06T12:00:00Z", revision=REVISION, environment="production",
+        ),
+    )
+    h = CausalHypothesis(
+        cause_subject="node-1", effect_subject="node-2",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="relabeled observation", status="proposed",
+        uncertainty=TruthfulValue(TruthState.SUCCESS, "claimed", None),
+        supporting_evidence=(support,), traceability=tr(), provenance_revision=REVISION,
+    )
+    # The confirmed gate must reject this — the evidence is observational, not
+    # intervention-grade, despite the INTERVENTION label and fabricated metadata.
+    with pytest.raises(ModelValidationError, match="intervention-grade W4 evidence"):
+        h.with_status("confirmed", known_evidence_ids={e.id}, known_evidence_records={e.id: e})

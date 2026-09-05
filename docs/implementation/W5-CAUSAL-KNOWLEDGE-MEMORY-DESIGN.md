@@ -40,7 +40,7 @@ evidence outranks observational correlation for causal claims). Observation-only
 support cannot reach `confirmed`; it may reach `supported` with non-SUCCESS
 uncertainty.
 
-## Evidence support + observation vs intervention
+## Evidence support + observation vs intervention (C3 — evidence-backed)
 
 `EvidenceSupport` references a W4 evidence id and declares `support_kind`:
 
@@ -50,8 +50,27 @@ uncertainty.
   `InterventionMetadata` (intervention_id, intervention_kind, applied_at,
   revision, environment) — provenance actually supplied by the source.
 
-An observation-only evidence id cannot be encoded as intervention support; the
-constructor rejects it.
+**Evidence-backed enforcement (SOS-W5-F01 resolution):** when the caller
+supplies a `known_evidence_records` map (a `dict[str, Evidence]` — W4 remains
+the sole evidence authority; W5 does not create a competing evidence store),
+`EvidenceSupport.validate(known_evidence_records=…)` resolves the referenced
+W4 `Evidence` and enforces:
+
+- `INTERVENTION` support is valid only for evidence that is actually
+  intervention-grade under the W4 record — `Evidence.kind` must be in
+  `INTERVENTION_GRADE_EVIDENCE_KINDS` = `{EXPERIMENT, CANARY, SHADOW, REPLAY,
+  SIMULATION}`. Observational W4 evidence (kind=OBSERVATION, TEST,
+  STATIC_ANALYSIS, etc.) is rejected as intervention support — it cannot be
+  relabeled.
+- `InterventionMetadata` provenance is consistent with the W4 evidence's
+  provenance (`revision` and `environment` must match where both are supplied) —
+  preventing fabricated metadata.
+
+The `confirmed` gate in `with_status("confirmed")` uses this evidence-backed
+validation: it requires `known_evidence_records` (refuses without it — no
+authorizing on an unverified label), resolves each INTERVENTION support against
+the actual W4 record, and rejects observational evidence relabeled as
+intervention.
 
 ## Truthful uncertainty (C4)
 

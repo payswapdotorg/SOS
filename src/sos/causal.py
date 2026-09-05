@@ -31,14 +31,52 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from .model import ModelValidationError, Traceability, TruthState, TruthfulValue
+from .evidence import EvidenceKind
+
+if TYPE_CHECKING:
+    from .evidence import Evidence
 
 
 # ---------------------------------------------------------------------------
 # Frozen causal vocabulary
 # ---------------------------------------------------------------------------
+
+
+# W4 EvidenceKind values that represent actual controlled interventions
+# (architecture §13.4: intervention evidence outranks observational correlation).
+# Only these kinds may back INTERVENTION-grade causal support.
+INTERVENTION_GRADE_EVIDENCE_KINDS: frozenset[EvidenceKind] = frozenset({
+    EvidenceKind.EXPERIMENT,
+    EvidenceKind.CANARY,
+    EvidenceKind.SHADOW,
+    EvidenceKind.REPLAY,
+    EvidenceKind.SIMULATION,
+})
+
+
+def _check_intervention_provenance_consistency(
+    intervention: InterventionMetadata, evidence: "Evidence"
+) -> None:
+    """Verify InterventionMetadata agrees with the W4 evidence's provenance.
+
+    Prevents fabricated intervention metadata from being attached to an
+    evidence record whose actual provenance differs (SOS-W5-F01).
+    """
+    ev_rev = evidence.provenance.implementation_revision
+    if ev_rev is not None and intervention.revision != ev_rev:
+        raise ModelValidationError(
+            f"InterventionMetadata.revision '{intervention.revision}' does not match "
+            f"evidence provenance revision '{ev_rev}'"
+        )
+    ev_env = evidence.provenance.environment
+    if ev_env is not None and intervention.environment != ev_env:
+        raise ModelValidationError(
+            f"InterventionMetadata.environment '{intervention.environment}' does not match "
+            f"evidence provenance environment '{ev_env}'"
+        )
 
 
 class CausalRelationType(str, Enum):
@@ -100,7 +138,7 @@ class EvidenceSupport:
     def __post_init__(self) -> None:
         self.validate()
 
-    def validate(self) -> None:
+    def validate(self, *, known_evidence_records: dict[str, "Evidence"] | None = None) -> None:
         if not self.evidence_id or not self.evidence_id.strip():
             raise ModelValidationError("EvidenceSupport.evidence_id is required")
         if not isinstance(self.support_kind, SupportKind):
@@ -111,6 +149,26 @@ class EvidenceSupport:
                     "INTERVENTION support requires explicit InterventionMetadata"
                 )
             self.intervention.validate()
+            # C3 enforcement: when the caller supplies the W4 evidence records,
+            # verify that the referenced evidence is actually intervention-grade
+            # under the W4 record — not merely relabeled. This prevents a plain
+            # observational evidence id from being promoted to intervention
+            # support with fabricated metadata (SOS-W5-F01).
+            if known_evidence_records is not None:
+                evidence = known_evidence_records.get(self.evidence_id)
+                if evidence is None:
+                    raise ModelValidationError(
+                        f"INTERVENTION support references unknown evidence id '{self.evidence_id}'"
+                    )
+                if evidence.kind not in INTERVENTION_GRADE_EVIDENCE_KINDS:
+                    raise ModelValidationError(
+                        f"INTERVENTION support requires intervention-grade W4 evidence "
+                        f"(kind={evidence.kind.value}); evidence '{self.evidence_id}' is "
+                        f"observational/factual (kind={evidence.kind.value})"
+                    )
+                # Provenance consistency: the InterventionMetadata must agree
+                # with the W4 evidence's provenance where both are supplied.
+                _check_intervention_provenance_consistency(self.intervention, evidence)
         elif self.intervention is not None:
             raise ModelValidationError(
                 "OBSERVATIONAL support must not carry InterventionMetadata"
@@ -155,6 +213,7 @@ class CausalHypothesis:
         *,
         known_evidence_ids: set[str] | None = None,
         known_evidence_results: dict[str, TruthState] | None = None,
+        known_evidence_records: dict[str, "Evidence"] | None = None,
     ) -> None:
         if not self.cause_subject.strip() or not self.effect_subject.strip():
             raise ModelValidationError("CausalHypothesis requires cause_subject and effect_subject")
@@ -176,7 +235,7 @@ class CausalHypothesis:
                 "an unsupported causal claim must not claim SUCCESS uncertainty (no implied truth)"
             )
         for support in self.supporting_evidence:
-            support.validate()
+            support.validate(known_evidence_records=known_evidence_records)
             if known_evidence_ids is not None and support.evidence_id not in known_evidence_ids:
                 raise ModelValidationError(
                     f"CausalHypothesis references unknown evidence id '{support.evidence_id}'"
@@ -198,22 +257,50 @@ class CausalHypothesis:
         *,
         known_evidence_ids: set[str] | None = None,
         known_evidence_results: dict[str, TruthState] | None = None,
+        known_evidence_records: dict[str, "Evidence"] | None = None,
     ) -> "CausalHypothesis":
         """Transition to a new lifecycle status with authority gating.
 
         - ``confirmed`` (a causal certainty state) requires at least one
-          intervention-grade supporting evidence record (architecture §13.4).
+          intervention-grade supporting evidence record that is actually
+          intervention-grade under the W4 evidence record (architecture §13.4).
+          When ``known_evidence_records`` is supplied, the evidence-backed
+          validation in ``EvidenceSupport.validate`` enforces this; without it,
+          the enum check alone is insufficient and ``confirmed`` is refused
+          (SOS-W5-F01).
         - ``supported`` is allowed for observation-backed claims but the
           uncertainty must remain non-SUCCESS unless intervention evidence exists.
         """
         if new_status == "confirmed":
-            has_intervention = any(s.support_kind == SupportKind.INTERVENTION for s in self.supporting_evidence)
+            # The confirmed gate MUST be evidence-backed: mere
+            # support_kind == INTERVENTION is insufficient because the caller
+            # could relabel observational evidence as intervention. When the
+            # caller supplies the W4 evidence records, EvidenceSupport.validate
+            # enforces that the referenced evidence is actually intervention-
+            # grade. Without the evidence map, we refuse confirmed to avoid
+            # authorizing on an unverified label (SOS-W5-F01).
+            if known_evidence_records is None:
+                raise ModelValidationError(
+                    "status 'confirmed' requires known_evidence_records to verify "
+                    "intervention-grade support against actual W4 evidence records"
+                )
+            has_intervention = False
+            for s in self.supporting_evidence:
+                if s.support_kind == SupportKind.INTERVENTION:
+                    # This will raise if the evidence is not intervention-grade
+                    # or if the metadata/provenance is inconsistent.
+                    s.validate(known_evidence_records=known_evidence_records)
+                    has_intervention = True
             if not has_intervention:
                 raise ModelValidationError(
                     "status 'confirmed' requires intervention-grade supporting evidence "
                     "(observation-only support cannot establish causal certainty)"
                 )
-        self.validate(known_evidence_ids=known_evidence_ids, known_evidence_results=known_evidence_results)
+        self.validate(
+            known_evidence_ids=known_evidence_ids,
+            known_evidence_results=known_evidence_results,
+            known_evidence_records=known_evidence_records,
+        )
         return CausalHypothesis(
             cause_subject=self.cause_subject, effect_subject=self.effect_subject,
             relation_type=self.relation_type, direction=self.direction,
@@ -276,6 +363,7 @@ class CausalKnowledgeGraph:
         *,
         known_evidence_ids: set[str] | None = None,
         known_evidence_results: dict[str, TruthState] | None = None,
+        known_evidence_records: dict[str, "Evidence"] | None = None,
     ) -> None:
         if not self.id or not self.id.strip():
             raise ModelValidationError("CausalKnowledgeGraph.id is required")
@@ -284,7 +372,11 @@ class CausalKnowledgeGraph:
         self.traceability.validate(require_value=True, require_context=True)
         seen: set[str] = set()
         for h in self.hypotheses:
-            h.validate(known_evidence_ids=known_evidence_ids, known_evidence_results=known_evidence_results)
+            h.validate(
+                known_evidence_ids=known_evidence_ids,
+                known_evidence_results=known_evidence_results,
+                known_evidence_records=known_evidence_records,
+            )
             if h.id in seen:
                 raise ModelValidationError(f"CausalKnowledgeGraph contains duplicate hypothesis id {h.id}")
             seen.add(h.id)
@@ -337,6 +429,7 @@ class ArchitectureMemory:
         known_graph_id: str | None = None,
         known_evidence_ids: set[str] | None = None,
         known_evidence_results: dict[str, TruthState] | None = None,
+        known_evidence_records: dict[str, "Evidence"] | None = None,
     ) -> None:
         if not self.id or not self.id.strip():
             raise ModelValidationError("ArchitectureMemory.id is required")
@@ -350,7 +443,11 @@ class ArchitectureMemory:
             )
         self.traceability.validate(require_value=True, require_context=True)
         for h in self.hypotheses:
-            h.validate(known_evidence_ids=known_evidence_ids, known_evidence_results=known_evidence_results)
+            h.validate(
+                known_evidence_ids=known_evidence_ids,
+                known_evidence_results=known_evidence_results,
+                known_evidence_records=known_evidence_records,
+            )
         ids = [h.id for h in self.hypotheses]
         if len(set(ids)) != len(ids):
             raise ModelValidationError("ArchitectureMemory.hypotheses must have unique ids")

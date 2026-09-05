@@ -1,10 +1,64 @@
 # W5 Implementation Checkpoint
 
 **Work Order:** `spec/work-orders/W5-causal-knowledge-memory.md`
-**State:** `WAITING_FOR_ARCHITECT`
+**State:** `WAITING_FOR_ARCHITECT` (review iteration 2)
 **Branch:** `work/w5-causal-knowledge-memory`
 **Base SHA:** `0af66c6aaae45e154af4f49bb4175002a17b4543`
-**Latest implementation SHA:** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+**Reviewed head (iteration 1):** `344ee573f91522b1a64cb4fee2d0b6dee402b57e`
+**Latest implementation SHA (iteration 2):** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+
+## Architect review (iteration 1) — one HIGH finding
+
+Reviewed exact head `344ee573f91522b1a64cb4fee2d0b6dee402b57e`. Base/dependency
+claims, bounded five-file scope, and non-authorizing/projection intent were
+sound. One HIGH finding remained; it is resolved in iteration 2 on the same PR.
+
+### SOS-W5-F01 — HIGH — C3 observation-vs-intervention not enforceable — RESOLVED
+
+Finding: `EvidenceSupport.validate()` only saw `evidence_id`, `support_kind`,
+and optional `InterventionMetadata`; it never resolved the referenced W4
+`Evidence`. Consequently a plain W4 observational evidence id could be relabeled
+`INTERVENTION` with fabricated metadata and then satisfy
+`CausalHypothesis.with_status("confirmed")`, because `confirmed` checked only
+`support_kind == INTERVENTION`. The iteration-1 test
+`test_observation_only_support_cannot_be_encoded_as_intervention` did not prove
+C3 enforcement: it supplied an observational evidence id but constructed
+`EvidenceSupport(..., support_kind=INTERVENTION)` without any W4 evidence lookup,
+so the constructor had no basis to reject it and the test only passed because
+`InterventionMetadata` was omitted.
+
+Resolution: W5 validation now resolves referenced W4 `Evidence` via a
+caller-supplied `known_evidence_records` map (no second evidence authority — W4
+remains the sole evidence authority). `EvidenceSupport.validate(
+known_evidence_records=…)` enforces that:
+
+- `INTERVENTION` support is valid only for evidence that is actually
+  intervention-grade under the W4 record — i.e., `Evidence.kind` must be in
+  `INTERVENTION_GRADE_EVIDENCE_KINDS` = `{EXPERIMENT, CANARY, SHADOW, REPLAY,
+  SIMULATION}`. Observational W4 evidence (kind=OBSERVATION, TEST,
+  STATIC_ANALYSIS, etc.) is rejected as intervention support.
+- `InterventionMetadata` provenance is consistent with the W4 evidence's
+  provenance (`revision` and `environment` must match where both are supplied).
+
+The `confirmed` gate in `with_status("confirmed")` now uses evidence-backed
+validation: it requires `known_evidence_records` (refuses without it — no
+authorizing on an unverified label), resolves each INTERVENTION support against
+the actual W4 record, and rejects observational evidence relabeled as
+intervention.
+
+Four regression tests prove the fix using actual W4 evidence records:
+
+- `test_observational_evidence_rejected_as_intervention_with_evidence_map` —
+  an actual W4 OBSERVATION evidence relabeled INTERVENTION + with
+  InterventionMetadata is rejected by evidence-backed validation;
+- `test_intervention_grade_evidence_accepted_as_intervention_with_evidence_map` —
+  an actual W4 EXPERIMENT evidence with consistent InterventionMetadata passes;
+- `test_intervention_metadata_provenance_mismatch_rejected` —
+  InterventionMetadata whose revision doesn't match the W4 evidence's provenance
+  is rejected;
+- `test_confirmed_gate_rejects_observational_evidence_relabelled_as_intervention` —
+  the confirmed gate rejects observational evidence relabeled as INTERVENTION,
+  the core C3 enforcement the Architect identified as missing.
 
 ## Dependency proof
 
@@ -62,7 +116,7 @@ no causal certainty derived from LLM narrative/text/confidence.
 |---|---|---|---|
 | R9, R24 | C1 deterministic causal identity | `_hypothesis_id` (SHA-256 over semantics + evidence) | `test_identical_causal_claims_produce_identical_identity`, `test_differing_relation_semantics_produce_distinct_identity`, `test_differing_supporting_evidence_produces_distinct_identity` |
 | R9 | C2 evidence-backed support | `validate(known_evidence_ids=…)`; unsupported ⇒ non-SUCCESS uncertainty | `test_causal_claim_must_reference_existing_evidence`, `test_unsupported_claim_must_carry_explicit_hypothesis_state`, `test_unsupported_claim_with_success_uncertainty_is_rejected` |
-| R10, R21 | C3 observation vs intervention | `SupportKind` + `InterventionMetadata`; observation≠intervention enforced | `test_observation_only_support_cannot_be_encoded_as_intervention`, `test_intervention_support_requires_intervention_metadata_and_provenance`, `test_intervention_support_without_intervention_metadata_rejected` |
+| R10, R21 | C3 observation vs intervention | `SupportKind` + `InterventionMetadata` + evidence-backed `known_evidence_records` (INTERVENTION only for intervention-grade W4 EvidenceKind; provenance consistency) | `test_observation_only_support_cannot_be_encoded_as_intervention`, `test_intervention_support_requires_intervention_metadata_and_provenance`, `test_intervention_support_without_intervention_metadata_rejected`, `test_observational_evidence_rejected_as_intervention_with_evidence_map` (F01), `test_intervention_grade_evidence_accepted_as_intervention_with_evidence_map` (F01), `test_intervention_metadata_provenance_mismatch_rejected` (F01), `test_confirmed_gate_rejects_observational_evidence_relabelled_as_intervention` (F01) |
 | R21 | C4 truthful uncertainty | `validate(known_evidence_results=…)`; contradictions coexist | `test_unknown_unavailable_failed_evidence_cannot_become_positive_causal_support`, `test_contradictory_hypotheses_coexist` |
 | R9 | C5 no authority mutation | `ArchitectureMemory.graph_ref` (string ref); graph never mutated | `test_causal_memory_does_not_mutate_canonical_graph` |
 | R24 | C6 deterministic memory behavior | `CausalKnowledgeGraph.ingest` dedup by id; sorted | `test_repeated_identical_ingestion_is_idempotent`, `test_causal_graph_orders_hypotheses_deterministically` |
@@ -87,15 +141,19 @@ Exact-head results (recorded in the PR description at push time):
 
 ```text
 $ python -m pytest
-83 passed in 0.28s
+87 passed in 0.30s
   tests/test_w1_models.py  ........   (8)
   tests/test_w2_graph.py   ........   (8)
   tests/test_w3_recovery.py .................... (20)
   tests/test_w4_evidence.py .........................  (25)
-  tests/test_w5_causal.py  ......................  (22)
+  tests/test_w5_causal.py  ..........................  (26)
 $ python -m compileall -q src tests
 (clean, no syntax errors)
 ```
+
+Iteration 1 (head `344ee57`) was 83 tests (22 W5); iteration 2 adds 4 F01
+regression tests -> 87 total (26 W5). CI on iteration 1 ran `pytest` -> `success`
+(both push and PR triggers); iteration 2 CI re-runs on the corrected head.
 
 ## Known limitations
 
@@ -129,8 +187,8 @@ $ python -m compileall -q src tests
 
 ## Architect disposition requested
 
-Review the exact PR head and CI result against the W5 Work Order. On approval,
-merge the reviewed head and reconcile canonical state to W6 eligibility (W6
-depends on W3 + W5; both would then be complete). Worker state:
-`WAITING_FOR_ARCHITECT`. No merge, no self-approval, no successor Work Order
-creation by this session.
+Review the exact PR head (iteration 2) and CI result against the W5 Work Order
+and the iteration-1 finding (SOS-W5-F01 — resolved). On approval, merge the
+reviewed head and reconcile canonical state to W6 eligibility (W6 depends on
+W3 + W5; both would then be complete). Worker state: `WAITING_FOR_ARCHITECT`.
+No merge, no self-approval, no successor Work Order creation by this session.
