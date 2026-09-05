@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "program": "SOS-v1",
+  "roadmap": "spec/implementation-roadmap.md",
+  "status": "FROZEN_FOUNDATION",
+  "tasks": {
+    "W0": {"status": "FOUNDATION_COMMITTED", "dependencies": [], "mergedAs": null},
+    "W1": {"status": "ELIGIBLE", "dependencies": ["W0"], "mergedAs": null},
+    "W2": {"status": "BLOCKED", "dependencies": ["W1"], "mergedAs": null},
+    "W3": {"status": "BLOCKED", "dependencies": ["W2"], "mergedAs": null},
+    "W4": {"status": "BLOCKED", "dependencies": ["W2"], "mergedAs": null},
+    "W5": {"status": "BLOCKED", "dependencies": ["W4"], "mergedAs": null},
+    "W6": {"status": "BLOCKED", "dependencies": ["W3", "W5"], "mergedAs": null},
+    "W7": {"status": "BLOCKED", "dependencies": ["W6"], "mergedAs": null},
+    "W8": {"status": "BLOCKED", "dependencies": ["W7"], "mergedAs": null},
+    "W9": {"status": "BLOCKED", "dependencies": ["W7", "W8"], "mergedAs": null},
+    "W10": {"status": "BLOCKED", "dependencies": ["W2", "W9"], "mergedAs": null},
+    "W11": {"status": "BLOCKED", "dependencies": ["W1", "W2", "W9"], "mergedAs": null},
+    "W12": {"status": "BLOCKED", "dependencies": ["W3", "W4", "W5", "W6", "W7", "W8", "W9"], "mergedAs": null},
+    "W13": {"status": "BLOCKED", "dependencies": ["W8", "W9"], "mergedAs": null},
+    "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
+    "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
+  },
+  "currentFrontier": ["W1"],
+  "currentTask": "W1",
+  "notes": [
+    "Initial authority/architecture/roadmap foundation was created before feature implementation.",
+    "W0 is represented by the foundational repository commit and frozen governance artifacts; no implementation branch exists yet.",
+    "All later status must be reconciled from actual Git merge evidence."
+  ]
+}
