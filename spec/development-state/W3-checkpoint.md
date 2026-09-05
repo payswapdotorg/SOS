@@ -4,7 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w3-architecture-recovery`
 **Base SHA:** `801754ab4dcbf5627f68ca65ad7d28973f1aa9de`
-**Latest implementation SHA:** `63de2a3d82f20efb35dfe7508f0d1e4a7cf39b1f`
+**Latest implementation SHA:** `9707facef2dc07fac893f1826b50cac8635f2e10`
 
 ## Dependency proof
 
@@ -37,14 +37,15 @@ No runtime observation, telemetry ingestion, causal inference, architecture memo
 
 ## Verification
 
-The repository's W2 `.github/workflows/test.yml` workflow runs `python -m pytest` on push and pull request. Public GitHub DNS is unavailable in this execution environment, so no local pass count is asserted. The W3 test suite is deterministic and covers inventory ordering, repository-local import extraction, provenance, unavailable runtime facts and invalid roots.
+The repository's W2 `.github/workflows/test.yml` workflow runs `python -m pytest` on push and pull request. Public GitHub DNS is unavailable in this execution environment, so no local pass count is asserted. The W3 tests are deterministic and exercise inventory ordering, repository-local dependency extraction, provenance, unavailable runtime facts and invalid roots.
 
 ## Known limitations
 
 - Python dependency extraction intentionally resolves only repository-root module paths; projects using extra source roots are conservatively incomplete rather than falsely connected.
+- `from package import symbol` imports are not expanded into dependency edges unless the module path itself resolves; direct module imports are supported.
 - JSON persistence remains the W1 dictionary wire format.
 - Static recovery cannot establish live runtime state; W4 remains responsible for runtime/evidence ingestion.
 
 ## Architect disposition requested
 
-Review the exact PR head against W3 scope and frozen architecture. On approval, merge the reviewed head and reconcile W3 completion. W4 remains independently eligible because it depends only on W2.
+Review exact PR head `9707facef2dc07fac893f1826b50cac8635f2e10` against W3 scope and frozen architecture. On approval, merge the reviewed head and reconcile W3 completion. W4 remains independently eligible because it depends only on W2.
