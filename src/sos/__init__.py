@@ -28,6 +28,15 @@ from .evidence import (
     OpenTelemetryShapedAdapter,
     StaticEvidenceAdapter,
 )
+from .causal import (
+    ArchitectureMemory,
+    CausalHypothesis,
+    CausalKnowledgeGraph,
+    CausalRelationType,
+    EvidenceSupport,
+    InterventionMetadata,
+    SupportKind,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
