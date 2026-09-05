@@ -11,7 +11,7 @@ def trace():
 
 def make_repo(root: Path) -> None:
     (root / "app").mkdir(parents=True)
-    (root / "app" / "a.py").write_text("from app import b\n", encoding="utf-8")
+    (root / "app" / "a.py").write_text("import app.b\n", encoding="utf-8")
     (root / "app" / "b.py").write_text("VALUE = 1\n", encoding="utf-8")
     (root / "pyproject.toml").write_text("[project]\nname='example'\n", encoding="utf-8")
     (root / "Dockerfile").write_text("FROM python:3.12\n", encoding="utf-8")
