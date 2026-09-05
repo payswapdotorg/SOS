@@ -20,6 +20,14 @@ from .recovery import (
     inventory_repository,
     recover_repository,
 )
+from .evidence import (
+    Evidence,
+    EvidenceGraph,
+    EvidenceKind,
+    EvidenceProvenance,
+    OpenTelemetryShapedAdapter,
+    StaticEvidenceAdapter,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
