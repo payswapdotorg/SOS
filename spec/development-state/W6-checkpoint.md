@@ -1,10 +1,48 @@
 # W6 Implementation Checkpoint
 
 **Work Order:** `spec/work-orders/W6-candidate-generation-search.md`
-**State:** `WAITING_FOR_ARCHITECT`
+**State:** `WAITING_FOR_ARCHITECT` (review iteration 2)
 **Branch:** `work/w6-candidate-generation-search`
 **Base SHA:** `771a1903321ff2e30cef0f67af49c8e870b3e485`
-**Latest implementation SHA:** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+**Reviewed head (iteration 1):** `db6cf243cb1004d17793615b7212f0c5e9ec835c`
+**Latest implementation SHA (iteration 2):** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+
+## Architect review (iteration 1) — one HIGH finding
+
+Reviewed exact head `db6cf243cb1004d17793615b7212f0c5e9ec835c`. The five-file
+scope was compliant, candidate truthfulness/Pareto semantics were directionally
+sound, search was bounded, and no canonical graph mutation was introduced. One
+HIGH finding remained; it is resolved in iteration 2 on the same PR.
+
+### SOS-W6-F01 — HIGH — replacement-node references not validated against the recovered graph — RESOLVED
+
+Finding: `SubgraphMutation.validate(graph)` verified `target_node_ids` and
+`boundary_interface_ids` were known, but never verified `replacement_node_ids`.
+The W6 design/checkpoint describe `available_replacements` as pairs drawn from
+the recovered graph, and a mutation is supposed to be validated against the
+actual recovered architecture. As implemented, a caller could construct a
+candidate replacing a real node with an arbitrary/nonexistent node id, and
+`SearchEngine` could emit such a candidate because `CandidateSpace.validate()`
+also checked only that the target existed. This violated the bounded mutation
+contract and permitted structurally invalid candidate proposals.
+
+Resolution: `SubgraphMutation.validate(graph)` now validates every
+`replacement_node_id` against the supplied `ArchitectureGraph` — replacement ids
+must be known nodes in the recovered graph (a candidate may only replace a real
+node with another real node). `CandidateSpace.validate()` now likewise rejects
+replacement ids not present in the base graph, so `SearchEngine` cannot emit
+structurally invalid candidates. Two regression tests prove the fix:
+
+- `test_candidate_mutation_rejects_unknown_replacement_node` — a
+  `SubgraphMutation` with a nonexistent replacement id is rejected by
+  `validate(graph)`;
+- `test_candidate_space_rejects_unknown_replacement_node` — a `CandidateSpace`
+  with an unknown replacement in `available_replacements` is rejected at
+  construction, so `SearchEngine` cannot emit it.
+
+The test fixture graph was extended to include real replacement nodes
+(`node-a-prime`, `node-b-prime`) so that legitimate candidate mutations satisfy
+the now-enforced contract.
 
 ## Dependency proof
 
@@ -64,7 +102,7 @@ correctness/authorization/safety/causal efficacy.
 | Requirement | Acceptance criterion | Implementation | Tests |
 |---|---|---|---|
 | R11, R24 | C1 candidate identity + provenance | `_candidate_id` (SHA-256 over graph+mutation+objectives+reasoning) | `test_identical_candidates_produce_identical_identity`, `test_differing_mutation_produces_distinct_identity` |
-| R8, R24 | C2 bounded mutation; canonical immutable | `SubgraphMutation.validate(graph)` (no mutation) | `test_candidate_mutation_validates_against_graph_without_mutating_it`, `test_candidate_mutation_rejects_unknown_target_nodes`, `test_candidate_mutation_rejects_unknown_boundary_node` |
+| R8, R24 | C2 bounded mutation; canonical immutable | `SubgraphMutation.validate(graph)` (no mutation; validates target + boundary + **replacement** nodes) | `test_candidate_mutation_validates_against_graph_without_mutating_it`, `test_candidate_mutation_rejects_unknown_target_nodes`, `test_candidate_mutation_rejects_unknown_boundary_node`, `test_candidate_mutation_rejects_unknown_replacement_node` (F01), `test_candidate_space_rejects_unknown_replacement_node` (F01) |
 | R11, R24 | C3 finite deterministic search | `SearchEngine.search` bounded by `SearchBounds` | `test_search_terminates_within_bounds_and_is_deterministic`, `test_search_rejects_unbounded_or_zero_bounds` |
 | R12, R15 | C4 multi-objective/Pareto | `CandidateEvaluation.dominates`, `ParetoFrontier.from_candidates` | `test_pareto_dominance_is_deterministic`, `test_pareto_frontier_excludes_dominated_candidates`, `test_no_single_scalar_quality_becomes_authoritative` |
 | R21, R24 | C5 uncertainty/truthfulness | candidate uncertainty never SUCCESS; objectives never SUCCESS | `test_candidate_scores_cannot_upgrade_truth`, `test_candidate_must_not_claim_success_without_intervention_evidence` |
@@ -90,16 +128,20 @@ Exact-head results (recorded in the PR description at push time):
 
 ```text
 $ python -m pytest
-109 passed in 0.34s
+111 passed in 0.33s
   tests/test_w1_models.py  ........   (8)
   tests/test_w2_graph.py   ........   (8)
   tests/test_w3_recovery.py .................... (20)
   tests/test_w4_evidence.py .........................  (25)
   tests/test_w5_causal.py  ..........................  (26)
-  tests/test_w6_candidates.py ......................  (22)
+  tests/test_w6_candidates.py ........................  (24)
 $ python -m compileall -q src tests
 (clean, no syntax errors)
 ```
+
+Iteration 1 (head `db6cf24`) was 109 tests (22 W6); iteration 2 adds 2 F01
+regression tests -> 111 total (24 W6). CI on iteration 1 ran `pytest` -> `success`
+(both push and PR triggers); iteration 2 CI re-runs on the corrected head.
 
 ## Known limitations
 
@@ -135,7 +177,8 @@ $ python -m compileall -q src tests
 
 ## Architect disposition requested
 
-Review the exact PR head and CI result against the W6 Work Order. On approval,
-merge the reviewed head and reconcile canonical state to W7 eligibility (W7
-depends on W6). Worker state: `WAITING_FOR_ARCHITECT`. No merge, no
-self-approval, no successor Work Order creation by this session.
+Review the exact PR head (iteration 2) and CI result against the W6 Work Order
+and the iteration-1 finding (SOS-W6-F01 — resolved). On approval, merge the
+reviewed head and reconcile canonical state to W7 eligibility (W7 depends on
+W6). Worker state: `WAITING_FOR_ARCHITECT`. No merge, no self-approval, no
+successor Work Order creation by this session.

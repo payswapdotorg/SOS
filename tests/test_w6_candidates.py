@@ -93,13 +93,21 @@ def _node(node_id: str, name: str = "svc") -> GraphNode:
 
 
 def graph(graph_id: str = "arch-1") -> ArchitectureGraph:
-    """A 3-node graph: service-a -> interface-i -> service-b."""
+    """A recovered graph with real candidate replacement nodes available.
+
+    Includes node-a-prime and node-b-prime as real nodes in the graph so that
+    candidate mutations replacing node-a -> node-a-prime (and node-b ->
+    node-b-prime) satisfy the SOS-W6-F01 contract that replacement ids must be
+    known nodes in the recovered graph.
+    """
     nodes = (
         _node("node-a", "service-a"),
         GraphNode(id="node-i", type=NodeType.INTERFACE, name="api",
                   attributes={"kind": "source", "source_path": "api", "revision": REVISION},
                   uncertainty=GraphUncertainty(TruthState.SUCCESS, confidence=1.0)),
         _node("node-b", "service-b"),
+        _node("node-a-prime", "service-a-prime"),
+        _node("node-b-prime", "service-b-prime"),
     )
     edges = (
         GraphEdge(id="e1", type=EdgeType.CALL, source_id="node-a", target_id="node-i",
@@ -233,6 +241,32 @@ def test_candidate_mutation_rejects_unknown_boundary_node():
     )
     with pytest.raises(ModelValidationError):
         bad.validate(arch)
+
+
+def test_candidate_mutation_rejects_unknown_replacement_node():
+    """SOS-W6-F01: a replacement node id not present in the recovered graph is
+    rejected by SubgraphMutation.validate(). A candidate may only replace a real
+    node with another real node — not an arbitrary/nonexistent replacement id."""
+    arch = graph()
+    bad = SubgraphMutation(
+        kind=MutationKind.SUBGRAPH_REPLACE, base_graph_ref=arch.id,
+        target_node_ids=("node-a",), replacement_node_ids=("nonexistent-replacement",),
+        boundary_interface_ids=("node-i",), invariants=("preserve-api",),
+    )
+    with pytest.raises(ModelValidationError, match="replacement references unknown nodes"):
+        bad.validate(arch)
+
+
+def test_candidate_space_rejects_unknown_replacement_node():
+    """SOS-W6-F01: CandidateSpace.validate() rejects replacement ids not present
+    in the base graph, so SearchEngine cannot emit structurally invalid candidates."""
+    arch = graph()
+    with pytest.raises(ModelValidationError, match="replacement 'nonexistent-replacement' is not in the base graph"):
+        CandidateSpace(
+            base_graph=arch, base_graph_revision=REVISION, traceability=tr(),
+            reasoning_evidence_ids=(), reasoning_hypothesis_ids=(),
+            available_replacements=(("node-a", "nonexistent-replacement"),),
+        )
 
 
 # --- C3: finite deterministic search ---

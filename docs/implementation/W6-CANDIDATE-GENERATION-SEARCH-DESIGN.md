@@ -27,6 +27,10 @@ mutation referencing the base graph by id: `kind`, `base_graph_ref`,
 mutating it** — boundary interfaces are nodes whose contracts the replacement
 must preserve (typically interface-type nodes adjacent to the target subgraph);
 they must be known graph nodes but need NOT be part of the target subgraph.
+**Replacement nodes must also be known nodes in the recovered graph** (SOS-W6-F01):
+a candidate may only replace a real node with another real node — arbitrary/
+nonexistent replacement ids are rejected by both `SubgraphMutation.validate()`
+and `CandidateSpace.validate()`.
 
 ## Candidate proposal
 

@@ -118,6 +118,12 @@ class SubgraphMutation:
         type nodes adjacent to the target subgraph), but need NOT be part of the
         target subgraph itself (the target is what gets replaced; the boundary
         is what is preserved).
+
+        Replacement nodes must also be known nodes in the recovered graph: a
+        candidate may only replace a real node with another real node (the W6
+        design describes ``available_replacements`` as pairs drawn from the
+        recovered graph). This prevents structurally invalid candidates that
+        reference arbitrary/nonexistent replacement ids (SOS-W6-F01).
         """
         self._validate_structural()
         if self.base_graph_ref != graph.id:
@@ -129,6 +135,8 @@ class SubgraphMutation:
             raise ModelValidationError("SubgraphMutation target references unknown nodes")
         if not set(self.boundary_interface_ids).issubset(node_ids):
             raise ModelValidationError("SubgraphMutation boundary references unknown nodes")
+        if not set(self.replacement_node_ids).issubset(node_ids):
+            raise ModelValidationError("SubgraphMutation replacement references unknown nodes")
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +390,15 @@ class CandidateSpace:
             if target not in node_ids:
                 raise ModelValidationError(
                     f"CandidateSpace.available_replacements target '{target}' is not in the base graph"
+                )
+            if replacement not in node_ids:
+                # SOS-W6-F01: replacement ids must be real nodes in the recovered
+                # graph; a candidate may only replace a real node with another
+                # real node. Reject unknown/arbitrary replacement ids at the
+                # search-space boundary so SearchEngine cannot emit structurally
+                # invalid candidates.
+                raise ModelValidationError(
+                    f"CandidateSpace.available_replacements replacement '{replacement}' is not in the base graph"
                 )
             if target == replacement:
                 raise ModelValidationError(
