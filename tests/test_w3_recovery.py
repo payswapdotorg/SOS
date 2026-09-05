@@ -147,6 +147,89 @@ def test_recovered_facts_carry_source_path_and_revision_provenance(tmp_path):
     assert any(f.relative_path == "pyproject.toml" for f in manifests)
 
 
+def test_recovered_graph_facts_carry_explicit_source_path_and_revision_provenance(tmp_path):
+    """F02: recovered W2 graph/dependency facts must carry explicit source-path +
+    revision provenance on their attributes (the existing W2 extensibility seam),
+    not only on the RecoveredFile inventory records.
+
+    Covers representative facts across the recovered vocabulary: component,
+    deployment, policy, external-dependency nodes, and dependency edges.
+    """
+    write_fixture_repo(tmp_path)
+    result = recover_repository(root=tmp_path, revision=REVISION, traceability=tr())
+    arch = result.system_state.architecture
+
+    # Every recovered graph node carries explicit source_path + revision provenance.
+    for node in arch.nodes:
+        attrs = dict(node.attributes)
+        assert "source_path" in attrs, f"node {node.id} ({node.type}) missing source_path provenance"
+        assert "revision" in attrs, f"node {node.id} ({node.type}) missing revision provenance"
+        assert attrs["revision"] == REVISION, f"node {node.id} revision mismatch"
+        assert attrs["source_path"], f"node {node.id} has empty source_path"
+
+    # Every recovered dependency edge carries explicit source-path + revision provenance.
+    dep_edges = [e for e in arch.edges if e.type == EdgeType.DEPENDENCY]
+    assert dep_edges, "expected at least one dependency edge in the fixture repo"
+    for edge in dep_edges:
+        attrs = dict(edge.attributes)
+        assert "source_path" in attrs, f"edge {edge.id} missing source_path provenance"
+        assert "source_manifest" in attrs, f"edge {edge.id} missing source_manifest provenance"
+        assert "revision" in attrs, f"edge {edge.id} missing revision provenance"
+        assert attrs["revision"] == REVISION, f"edge {edge.id} revision mismatch"
+        assert attrs["source_path"] == attrs["source_manifest"], (
+            f"edge {edge.id}: dependency edge source_path must equal its source_manifest"
+        )
+
+    # Representative node-type provenance spot checks (component/deployment/policy/external-dependency).
+    component_nodes = [n for n in arch.nodes if n.type == NodeType.COMPONENT]
+    deployment_nodes = [n for n in arch.nodes if n.type == NodeType.DEPLOYMENT]
+    policy_nodes = [n for n in arch.nodes if n.type == NodeType.POLICY]
+    ext_dep_nodes = [n for n in arch.nodes if n.type == NodeType.EXTERNAL_DEPENDENCY]
+    assert component_nodes, "fixture must recover at least one component node"
+    assert deployment_nodes, "fixture must recover at least one deployment node"
+    assert policy_nodes, "fixture must recover at least one policy node"
+    assert ext_dep_nodes, "fixture must recover at least one external-dependency node"
+
+    # A source component's source_path is its own file path.
+    source_component = next(n for n in component_nodes if dict(n.attributes).get("kind") == "source")
+    assert source_component.attributes["source_path"] == source_component.name
+    assert source_component.attributes["revision"] == REVISION
+
+    # A deployment node's source_path is the recovered deployment artifact path.
+    deployment = deployment_nodes[0]
+    assert deployment.attributes["source_path"] == deployment.name
+    assert deployment.attributes["revision"] == REVISION
+
+    # A policy node's source_path is the recovered config artifact path.
+    policy = policy_nodes[0]
+    assert policy.attributes["source_path"] == policy.name
+    assert policy.attributes["revision"] == REVISION
+
+    # An external-dependency node's provenance points at the manifest that
+    # declared it (not a repo file), at the recovered revision.
+    ext_dep = ext_dep_nodes[0]
+    assert ext_dep.attributes["revision"] == REVISION
+    assert ext_dep.attributes["source_manifest"] in {"pyproject.toml", "requirements.txt", "package.json"}
+    assert ext_dep.attributes["source_path"] == ext_dep.attributes["source_manifest"]
+
+
+def test_recovered_graph_provenance_is_deterministic(tmp_path, tmp_path_factory):
+    """F02: provenance attributes are deterministic — identical bytes + same
+    revision produce identical provenance on the recovered graph facts."""
+    r1 = tmp_path_factory.mktemp("repo-a")
+    r2 = tmp_path_factory.mktemp("repo-b")
+    write_fixture_repo(r1)
+    write_fixture_repo(r2)
+    a = recover_repository(root=r1, revision=REVISION, traceability=tr())
+    b = recover_repository(root=r2, revision=REVISION, traceability=tr())
+    a_attrs = {n.id: dict(n.attributes) for n in a.system_state.architecture.nodes}
+    b_attrs = {n.id: dict(n.attributes) for n in b.system_state.architecture.nodes}
+    assert a_attrs == b_attrs
+    a_edges = {e.id: dict(e.attributes) for e in a.system_state.architecture.edges}
+    b_edges = {e.id: dict(e.attributes) for e in b.system_state.architecture.edges}
+    assert a_edges == b_edges
+
+
 def test_recovered_state_carries_w1_traceability(tmp_path):
     write_fixture_repo(tmp_path)
     t = tr()

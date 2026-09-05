@@ -391,6 +391,22 @@ def _certain() -> GraphUncertainty:
     return GraphUncertainty(TruthState.SUCCESS, confidence=1.0)
 
 
+def _file_provenance(file: RecoveredFile) -> dict[str, str]:
+    """Explicit source-path + repository-revision provenance for a file-derived graph fact."""
+    return {"source_path": file.relative_path, "revision": file.revision}
+
+
+def _dep_provenance(dep: RecoveredDependency) -> dict[str, str]:
+    """Explicit provenance for a dependency-derived graph fact.
+
+    A recovered external dependency is not itself a repository file; its provenance
+    is the manifest that declared it at the recovered revision. ``source_path`` is
+    set to that manifest path so dependency facts carry the same explicit
+    source-path + revision provenance seam as file-derived facts.
+    """
+    return {"source_manifest": dep.source_manifest, "source_path": dep.source_manifest, "revision": dep.revision}
+
+
 def _build_graph(inventory: RepositoryInventory, traceability: Traceability) -> tuple[ArchitectureGraph, tuple[RecoveredDependency, ...], tuple[UnresolvedFact, ...]]:
     nodes: list[GraphNode] = []
     edges: list[GraphEdge] = []
@@ -401,29 +417,34 @@ def _build_graph(inventory: RepositoryInventory, traceability: Traceability) -> 
 
     for f in inventory.files:
         node_id = _deterministic_id("node", inventory.revision, f.relative_path)
+        provenance = _file_provenance(f)
         if f.classification == FileClassification.SOURCE:
             nodes.append(GraphNode(
                 id=node_id, type=NodeType.COMPONENT, name=f.relative_path,
-                attributes={"kind": "source", "language": Path(f.relative_path).suffix.lstrip(".")},
+                attributes={
+                    "kind": "source",
+                    "language": Path(f.relative_path).suffix.lstrip("."),
+                    **provenance,
+                },
                 uncertainty=_certain(),
             ))
         elif f.classification == FileClassification.MANIFEST:
             manifest_nodes[f.relative_path] = node_id
             nodes.append(GraphNode(
                 id=node_id, type=NodeType.COMPONENT, name=f.relative_path,
-                attributes={"kind": "manifest"},
+                attributes={"kind": "manifest", **provenance},
                 uncertainty=_certain(),
             ))
         elif f.classification == FileClassification.DEPLOYMENT:
             nodes.append(GraphNode(
                 id=node_id, type=NodeType.DEPLOYMENT, name=f.relative_path,
-                attributes={"kind": "deployment-artifact"},
+                attributes={"kind": "deployment-artifact", **provenance},
                 uncertainty=_certain(),
             ))
         elif f.classification in (FileClassification.CONFIG, FileClassification.POLICY):
             nodes.append(GraphNode(
                 id=node_id, type=NodeType.POLICY, name=f.relative_path,
-                attributes={"kind": "config"},
+                attributes={"kind": "config", **provenance},
                 uncertainty=_certain(),
             ))
         # DOCUMENTATION / BINARY / UNCLASSIFIED are recorded in the inventory
@@ -463,7 +484,11 @@ def _build_graph(inventory: RepositoryInventory, traceability: Traceability) -> 
         dep_node_ids[dep.name] = dep_node_id
         nodes.append(GraphNode(
             id=dep_node_id, type=NodeType.EXTERNAL_DEPENDENCY, name=dep.name,
-            attributes={"spec": dep.spec, "kind": "external-dependency"},
+            attributes={
+                "kind": "external-dependency",
+                "spec": dep.spec,
+                **_dep_provenance(dep),
+            },
             uncertainty=_certain(),
         ))
     for dep in deps:
@@ -474,7 +499,10 @@ def _build_graph(inventory: RepositoryInventory, traceability: Traceability) -> 
         edges.append(GraphEdge(
             id=edge_id, type=EdgeType.DEPENDENCY,
             source_id=manifest_node_id, target_id=dep_node_ids[dep.name],
-            attributes={"spec": dep.spec},
+            attributes={
+                "spec": dep.spec,
+                **_dep_provenance(dep),
+            },
             uncertainty=_certain(),
         ))
 
