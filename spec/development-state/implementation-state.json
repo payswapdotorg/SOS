@@ -2,12 +2,12 @@
   "schemaVersion": "1.0",
   "program": "SOS-v1",
   "roadmap": "spec/implementation-roadmap.md",
-  "status": "W1_COMPLETE",
+  "status": "W3_DISPATCHED",
   "tasks": {
     "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
-    "W2": {"status": "ELIGIBLE", "dependencies": ["W1"], "mergedAs": null},
-    "W3": {"status": "BLOCKED", "dependencies": ["W2"], "mergedAs": null},
+    "W2": {"status": "COMPLETE", "dependencies": ["W1"], "mergedAs": "587201d3e12a10ba9fac6da751d663a40c33dfb9"},
+    "W3": {"status": "DISPATCHED", "dependencies": ["W2"], "mergedAs": null},
     "W4": {"status": "BLOCKED", "dependencies": ["W2"], "mergedAs": null},
     "W5": {"status": "BLOCKED", "dependencies": ["W4"], "mergedAs": null},
     "W6": {"status": "BLOCKED", "dependencies": ["W3", "W5"], "mergedAs": null},
@@ -21,12 +21,13 @@
     "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
     "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
   },
-  "currentFrontier": ["W2"],
-  "currentTask": "W2",
+  "currentFrontier": ["W3"],
+  "currentTask": "W3",
   "notes": [
     "W0 is the one-time empty-repository bootstrap exception; later task completion follows normal Architect-gated merge semantics.",
     "W1 completed via PR #1 after exact-head review and merge; reconciliation is based on merge SHA rather than the pre-merge branch head.",
-    "W2 is eligible because W1 is authoritatively merged and the W2 Work Order now exists on main.",
+    "W2 is authoritatively merged as 587201d3e12a10ba9fac6da751d663a40c33dfb9.",
+    "W3 is dispatched from the W2 boundary. W4 remains independently eligible by roadmap dependency but is not dispatched in this cycle.",
     "All later status must be reconciled from actual Git merge evidence.",
     "Never treat this file's projections as stronger than Git history or frozen architecture."
   ]
