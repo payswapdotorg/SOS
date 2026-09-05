@@ -4,7 +4,7 @@
 **State:** `WAITING_FOR_ARCHITECT`
 **Branch:** `work/w7-assurance`
 **Base SHA:** `08e1e6f18ae1b29b22ce5ce305c6f017832af370`
-**Latest implementation SHA:** `50e72152a0395d73140b4ea70ee0fcb5c65d891e`
+**Latest implementation SHA:** `e8228856bdcdfc3c1bc7cd76afcfea6c364c43c7`
 
 ## Dependency proof
 
@@ -45,4 +45,4 @@ Repository CI runs `python -m pytest`; this environment cannot resolve public Gi
 
 ## Architect disposition requested
 
-Review exact PR head `50e72152a0395d73140b4ea70ee0fcb5c65d891e`, verify CI, and merge only the reviewed head. After merge, W8 becomes eligible.
+Review exact PR head `e8228856bdcdfc3c1bc7cd76afcfea6c364c43c7`, verify CI, and merge only the reviewed head. After merge, W8 becomes eligible.
