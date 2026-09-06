@@ -60,6 +60,18 @@ from .assurance import (
     ReversibilityAssessment,
     assure_candidate,
 )
+from .experimentation import (
+    Experiment,
+    ExperimentEvaluation,
+    ExperimentMode,
+    ExperimentState,
+    PromotionDecision,
+    PromotionGate,
+    RollbackPath,
+    StopCondition,
+    evaluate_experiment,
+    transition_experiment,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
