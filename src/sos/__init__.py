@@ -72,6 +72,14 @@ from .experimentation import (
     evaluate_experiment,
     transition_experiment,
 )
+from .autonomy import (
+    AutonomyDecision,
+    AutonomyDecisionState,
+    AutonomyRequest,
+    PolicyCeiling,
+    evaluate_autonomy,
+    validate_decision_transition,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
