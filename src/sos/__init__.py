@@ -80,6 +80,19 @@ from .autonomy import (
     evaluate_autonomy,
     validate_decision_transition,
 )
+from .personalization import (
+    ContextualPolicy,
+    ContextualSelector,
+    PersonalizationDecision,
+    evaluate_personalization,
+)
+from .platform import (
+    AdapterCapability,
+    AdapterPlan,
+    PlatformAdapter,
+    PlatformSurface,
+    validate_adapter,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
