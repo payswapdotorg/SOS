@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
-from .model import ModelValidationError, Traceability, TruthState, TruthfulValue
+from .model import ModelValidationError, Traceability, TruthState, TruthfulValue, DecisionAction
 
 if TYPE_CHECKING:
     from .assurance import AssuranceResult
@@ -114,6 +114,12 @@ class AutonomyRequest:
             raise ModelValidationError("AutonomyRequest.version must be >= 1")
         if not self.allowed_actions:
             raise ModelValidationError("AutonomyRequest.allowed_actions is required")
+        # SOS-W9-F07: every allowed action must be a real DecisionAction enum member.
+        for a in self.allowed_actions:
+            if not isinstance(a, DecisionAction):
+                raise ModelValidationError(
+                    f"AutonomyRequest.allowed_actions contains a non-DecisionAction value: {a!r}"
+                )
         self.ceilings.__post_init__()
         self.traceability.validate(require_value=True, require_context=True)
 
@@ -195,6 +201,9 @@ def evaluate_autonomy(
     human_authority_present: bool = False,
     blast_radius: str = "limited",
     rollback_path: "RollbackPath | None" = None,
+    risk: float = 0.0,
+    confidence: float = 0.0,
+    reversible: bool = True,
 ) -> AutonomyDecision:
     """Evaluate an autonomy decision deterministically (C2–C10).
 
@@ -255,7 +264,45 @@ def evaluate_autonomy(
             policy_id=policy.id, traceability=traceability,
         )
 
-    # Handle ROLLBACK specifically (C8)
+    # SOS-W9-F01: enforce policy ceilings (risk, reversibility, confidence).
+    if risk > policy.ceilings.max_risk:
+        state = AutonomyDecisionState.ASK
+        reasons.append(f"risk {risk} exceeds policy ceiling {policy.ceilings.max_risk}")
+        return AutonomyDecision(
+            id="", state=state, action=action,
+            rationale="risk exceeds policy ceiling; ASK for human authority",
+            reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+            assurance_id=assurance.id if assurance else "",
+            experiment_id=experiment.id if experiment else None,
+            promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+            policy_id=policy.id, traceability=traceability,
+        )
+    if policy.ceilings.require_reversible and not reversible:
+        state = AutonomyDecisionState.ASK
+        reasons.append("policy requires reversibility; action is not reversible")
+        return AutonomyDecision(
+            id="", state=state, action=action,
+            rationale="action not reversible; policy requires reversibility; ASK",
+            reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+            assurance_id=assurance.id if assurance else "",
+            experiment_id=experiment.id if experiment else None,
+            promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+            policy_id=policy.id, traceability=traceability,
+        )
+    if confidence < policy.ceilings.min_confidence:
+        state = AutonomyDecisionState.ASK
+        reasons.append(f"confidence {confidence} below policy floor {policy.ceilings.min_confidence}")
+        return AutonomyDecision(
+            id="", state=state, action=action,
+            rationale="confidence below policy floor; ASK",
+            reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+            assurance_id=assurance.id if assurance else "",
+            experiment_id=experiment.id if experiment else None,
+            promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+            policy_id=policy.id, traceability=traceability,
+        )
+
+    # Handle ROLLBACK specifically (C8) — SOS-W9-F03: require verifiable evidence + ref binding
     if action.value == "ROLLBACK":
         if rollback_path is None:
             state = AutonomyDecisionState.ASK
@@ -269,22 +316,59 @@ def evaluate_autonomy(
                 promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
                 policy_id=policy.id, traceability=traceability,
             )
-        # Validate rollback evidence
-        if known_evidence is not None:
-            for eid in rollback_path.evidence_ids:
-                ev = known_evidence.get(eid)
-                if ev is None or ev.result.state != TruthState.SUCCESS:
-                    state = AutonomyDecisionState.ASK
-                    reasons.append(f"rollback evidence '{eid}' not SUCCESS; ASK")
-                    return AutonomyDecision(
-                        id="", state=state, action=action,
-                        rationale="rollback evidence not SUCCESS; ASK",
-                        reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
-                        assurance_id=assurance.id if assurance else "",
-                        experiment_id=experiment.id if experiment else None,
-                        promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
-                        policy_id=policy.id, traceability=traceability,
-                    )
+        # SOS-W9-F03: rollback_path.reference must match experiment.rollback_ref.
+        if experiment is not None and experiment.rollback_ref and rollback_path.reference != experiment.rollback_ref:
+            state = AutonomyDecisionState.ASK
+            reasons.append(f"rollback_path.reference '{rollback_path.reference}' does not match experiment.rollback_ref '{experiment.rollback_ref}'")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="rollback reference mismatch; ASK",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=experiment.id if experiment else None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
+        # SOS-W9-F03: known_evidence is REQUIRED (not optional) for rollback validation.
+        if known_evidence is None:
+            state = AutonomyDecisionState.ASK
+            reasons.append("rollback requires a verifiable evidence store; no known_evidence supplied")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="rollback requires verifiable evidence store; ASK",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=experiment.id if experiment else None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
+        # Validate all rollback evidence is SUCCESS
+        for eid in rollback_path.evidence_ids:
+            ev = known_evidence.get(eid)
+            if ev is None:
+                state = AutonomyDecisionState.ASK
+                reasons.append(f"rollback evidence '{eid}' not found in known_evidence; ASK")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="rollback evidence not found; ASK",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id if assurance else "",
+                    experiment_id=experiment.id if experiment else None,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if ev.result.state != TruthState.SUCCESS:
+                state = AutonomyDecisionState.ASK
+                reasons.append(f"rollback evidence '{eid}' state is {ev.result.state.value}; ASK")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale=f"rollback evidence {ev.result.state.value}; ASK",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id if assurance else "",
+                    experiment_id=experiment.id if experiment else None,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                    policy_id=policy.id, traceability=traceability,
+                )
         state = AutonomyDecisionState.ROLLBACK
         reasons.append("rollback action with governed recovery evidence")
         return AutonomyDecision(
@@ -325,7 +409,7 @@ def evaluate_autonomy(
             policy_id=policy.id, traceability=traceability,
         )
 
-    # For ACT: C4 — require W7 PASS assurance + W8 promotion
+    # For ACT: C4 — require W7 PASS assurance + W8 promotion + full chain validation
     if action.value == "ACT":
         if assurance is None:
             state = AutonomyDecisionState.ASK
@@ -339,10 +423,9 @@ def evaluate_autonomy(
                 policy_id=policy.id, traceability=traceability,
             )
         # C4: W7 PASS is non-authorizing — PASS alone is not an authorization token.
-        # ACT also requires a promoted W8 PromotionDecision.
         if assurance.status.value != "PASS":
             state = AutonomyDecisionState.REJECT
-            reasons.append(f"assurance status is {assurance.status.value}, not PASS")
+            reasons.append(f"assurance status is {assurance.status.value}, not PASS; REJECT")
             return AutonomyDecision(
                 id="", state=state, action=action,
                 rationale=f"assurance {assurance.status.value} cannot authorize ACT; REJECT",
@@ -365,35 +448,131 @@ def evaluate_autonomy(
                 promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
                 policy_id=policy.id, traceability=traceability,
             )
+        # SOS-W9-F02: validate the complete W7→W8 authorization chain.
+        # promotion must belong to the exact experiment and assurance/candidate/graph/revision/provenance.
+        if experiment is not None and promotion.experiment_id != experiment.id:
+            state = AutonomyDecisionState.REJECT
+            reasons.append(f"promotion.experiment_id '{promotion.experiment_id}' does not match experiment '{experiment.id}'")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="promotion not bound to the exact experiment; REJECT",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id,
+                experiment_id=experiment.id,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                policy_id=policy.id, traceability=traceability,
+            )
+        if experiment is not None:
+            # Validate experiment ↔ assurance chain
+            if experiment.assurance_result_id != assurance.id:
+                state = AutonomyDecisionState.REJECT
+                reasons.append(f"experiment.assurance_result_id '{experiment.assurance_result_id}' does not match assurance '{assurance.id}'")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="experiment not bound to the exact assurance; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if experiment.candidate_id != assurance.candidate_id:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("experiment.candidate_id does not match assurance.candidate_id")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="experiment/assurance candidate chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if experiment.base_graph_id != assurance.base_graph_id:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("experiment.base_graph_id does not match assurance.base_graph_id")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="experiment/assurance graph chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if experiment.base_graph_revision != assurance.base_graph_revision:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("experiment.base_graph_revision does not match assurance.base_graph_revision")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="experiment/assurance revision chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if experiment.provenance_revision != assurance.provenance_revision:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("experiment.provenance_revision does not match assurance.provenance_revision")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="experiment/assurance provenance chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
 
-        # C5: verify evidence truth states
-        if known_evidence is not None and evidence_ids:
-            for eid in evidence_ids:
-                ev = known_evidence.get(eid)
-                if ev is None:
-                    state = AutonomyDecisionState.GATHER_EVIDENCE
-                    reasons.append(f"evidence '{eid}' not found; GATHER_EVIDENCE")
-                    return AutonomyDecision(
-                        id="", state=state, action=action,
-                        rationale="missing evidence; GATHER_EVIDENCE",
-                        reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
-                        assurance_id=assurance.id,
-                        experiment_id=experiment.id if experiment else None,
-                        promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
-                        policy_id=policy.id, traceability=traceability,
-                    )
-                if ev.result.state != TruthState.SUCCESS:
-                    state = AutonomyDecisionState.GATHER_EVIDENCE
-                    reasons.append(f"evidence '{eid}' state is {ev.result.state.value}; GATHER_EVIDENCE")
-                    return AutonomyDecision(
-                        id="", state=state, action=action,
-                        rationale=f"non-SUCCESS evidence; GATHER_EVIDENCE",
-                        reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
-                        assurance_id=assurance.id,
-                        experiment_id=experiment.id if experiment else None,
-                        promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
-                        policy_id=policy.id, traceability=traceability,
-                    )
+        # SOS-W9-F04: ACT requires a non-empty evidence set.
+        if not evidence_ids:
+            state = AutonomyDecisionState.GATHER_EVIDENCE
+            reasons.append("ACT requires non-empty evidence; no evidence_ids supplied")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="no evidence supplied; GATHER_EVIDENCE",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id,
+                experiment_id=experiment.id if experiment else None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                policy_id=policy.id, traceability=traceability,
+            )
+        # SOS-W9-F04/F05: known_evidence is REQUIRED; every referenced record must resolve to SUCCESS.
+        if known_evidence is None:
+            state = AutonomyDecisionState.GATHER_EVIDENCE
+            reasons.append("ACT requires a verifiable evidence store; no known_evidence supplied")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="no evidence store supplied; GATHER_EVIDENCE",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id,
+                experiment_id=experiment.id if experiment else None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                policy_id=policy.id, traceability=traceability,
+            )
+        for eid in evidence_ids:
+            ev = known_evidence.get(eid)
+            if ev is None:
+                state = AutonomyDecisionState.GATHER_EVIDENCE
+                reasons.append(f"evidence '{eid}' not found in known_evidence; GATHER_EVIDENCE")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale=f"missing evidence '{eid}'; GATHER_EVIDENCE",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id,
+                    experiment_id=experiment.id if experiment else None,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            # SOS-W9-F05: preserve the specific W4 truth state in the reason.
+            if ev.result.state != TruthState.SUCCESS:
+                state = AutonomyDecisionState.GATHER_EVIDENCE
+                reasons.append(f"evidence '{eid}' state is {ev.result.state.value}; GATHER_EVIDENCE")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale=f"evidence state {ev.result.state.value}; GATHER_EVIDENCE",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id,
+                    experiment_id=experiment.id if experiment else None,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
 
         # All gates passed: ACT
         state = AutonomyDecisionState.ACT

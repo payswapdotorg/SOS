@@ -265,11 +265,12 @@ def test_act_requires_promotion_and_policy_authorization():
     ar = pass_assurance()
     exp, ev, promo = completed_experiment_with_promotion(ar)
     p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
     result = evaluate_autonomy(
         policy=p, action=DecisionAction.ACT,
         assurance=ar, experiment=exp, promotion=promo,
-        evidence_ids=(ev.evidence_ids[0] if ev.evidence_ids else "e1",),
-        traceability=tr(),
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
     )
     assert result.state == AutonomyDecisionState.ACT
 
@@ -334,11 +335,13 @@ def test_human_authority_present_allows_act():
         ),
         traceability=tr(),
     )
+    e_ok = evidence(subject="node-a", value="120ms")
     result = evaluate_autonomy(
         policy=p_with_approval, action=DecisionAction.ACT,
         assurance=ar, experiment=exp, promotion=promo,
-        evidence_ids=(), traceability=tr(),
-        human_authority_present=True,  # human authority present
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        human_authority_present=True,
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
     )
     assert result.state == AutonomyDecisionState.ACT
 
@@ -442,7 +445,7 @@ def test_rollback_with_governed_recovery_can_act():
         assurance=ar, experiment=exp, promotion=promo,
         evidence_ids=(rb.id,), traceability=tr(),
         known_evidence={rb.id: rb},
-        rollback_path=rbp,
+        rollback_path=rbp, confidence=0.9, risk=0.1,
     )
     assert result.state == AutonomyDecisionState.ROLLBACK
 
@@ -544,3 +547,183 @@ def test_confidence_alone_cannot_authorize():
         evidence_ids=(), traceability=tr(),
     )
     assert result.state != AutonomyDecisionState.ACT
+
+
+# --- SOS-W9-F01 regression: policy ceilings enforced ---
+
+
+def test_risk_exceeding_ceiling_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.5,
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+def test_irreversible_action_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1, reversible=False,
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+def test_confidence_below_floor_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.5, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+def test_act_rejects_promotion_not_bound_to_experiment():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    wrong_promo = PromotionDecision(
+        promoted=True, rationale="wrong", experiment_id="different-experiment-id", evaluation_id=ev.id,
+    )
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=wrong_promo,
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.REJECT
+
+
+def test_rollback_without_known_evidence_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p_rb = AutonomyRequest(
+        id="policy-rb", version=1, allowed_actions=(DecisionAction.ROLLBACK,),
+        ceilings=PolicyCeiling(max_risk=0.3, max_blast_radius="service", require_reversible=True,
+            min_confidence=0.8, require_human_approval_for_act=False),
+        traceability=tr(),
+    )
+    rb = rollback_evidence()
+    rbp = RollbackPath(reference="rb-1", evidence_ids=(rb.id,), detail="verified")
+    result = evaluate_autonomy(
+        policy=p_rb, action=DecisionAction.ROLLBACK, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(rb.id,), traceability=tr(), known_evidence=None, rollback_path=rbp, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+def test_rollback_with_mismatched_reference_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p_rb = AutonomyRequest(
+        id="policy-rb", version=1, allowed_actions=(DecisionAction.ROLLBACK,),
+        ceilings=PolicyCeiling(max_risk=0.3, max_blast_radius="service", require_reversible=True,
+            min_confidence=0.8, require_human_approval_for_act=False),
+        traceability=tr(),
+    )
+    rb = rollback_evidence()
+    rbp = RollbackPath(reference="wrong-ref", evidence_ids=(rb.id,), detail="wrong")
+    result = evaluate_autonomy(
+        policy=p_rb, action=DecisionAction.ROLLBACK, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(rb.id,), traceability=tr(), known_evidence={rb.id: rb}, rollback_path=rbp, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+def test_act_with_empty_evidence_routes_to_gather_evidence():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(), traceability=tr(), known_evidence={}, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.GATHER_EVIDENCE
+
+
+def test_act_without_known_evidence_store_routes_to_gather_evidence():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(e_ok.id,), traceability=tr(), known_evidence=None, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.GATHER_EVIDENCE
+
+
+@pytest.mark.parametrize("state,detail", [
+    (TruthState.UNKNOWN, "no data"),
+    (TruthState.FAILED, "test raised"),
+    (TruthState.UNAVAILABLE, "collector down"),
+    (TruthState.UNSUPPORTED, "not supported"),
+])
+def test_non_success_evidence_states_prevent_act(state, detail):
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_bad = evidence(subject="node-a", state=state, detail=detail)
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(e_bad.id,), traceability=tr(), known_evidence={e_bad.id: e_bad}, confidence=0.9, risk=0.1,
+    )
+    assert result.state != AutonomyDecisionState.ACT
+    assert any(state.value in r for r in result.reasons)
+
+
+def test_fail_assurance_rejects_act():
+    arch = graph()
+    e_unknown = evidence(subject="node-a", state=TruthState.UNKNOWN, detail="no data")
+    h = CausalHypothesis(
+        cause_subject="node-a", effect_subject="node-b",
+        relation_type=CausalRelationType.INFLUENCES, direction="positive",
+        rationale="r", status="proposed",
+        uncertainty=TruthfulValue(TruthState.UNKNOWN, None, "observation only"),
+        supporting_evidence=(), traceability=tr(), provenance_revision=REVISION,
+    )
+    m = SubgraphMutation(
+        kind=MutationKind.SUBGRAPH_REPLACE, base_graph_ref="arch-1",
+        target_node_ids=("node-a",), replacement_node_ids=("node-a-prime",),
+        boundary_interface_ids=("node-i",), invariants=("preserve-api",),
+    )
+    c = CandidateProposal(
+        id="", base_graph_ref="arch-1", base_graph_revision=REVISION,
+        mutation=m, objectives=objectives(), rationale="r",
+        uncertainty=TruthfulValue(TruthState.UNKNOWN, None, "predicted"),
+        reasoning_evidence_ids=(e_unknown.id,), reasoning_hypothesis_ids=(h.id,),
+        risks=(), traceability=tr(), provenance_revision=REVISION,
+    )
+    ar = assure_candidate(candidate=c, base_graph=arch, known_evidence={e_unknown.id: e_unknown}, known_hypotheses={h.id: h})
+    assert ar.status != AssuranceStatus.PASS
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=None, promotion=None,
+        evidence_ids=(e_ok.id,), traceability=tr(), known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.REJECT
+
+
+def test_policy_rejects_non_decision_action_in_allowed_actions():
+    with pytest.raises(ModelValidationError, match="non-DecisionAction"):
+        AutonomyRequest(
+            id="bad-policy", version=1,
+            allowed_actions=("ACT", "EXPERIMENT"),
+            ceilings=PolicyCeiling(max_risk=0.3, max_blast_radius="service", require_reversible=True,
+                min_confidence=0.8, require_human_approval_for_act=False),
+            traceability=tr(),
+        )

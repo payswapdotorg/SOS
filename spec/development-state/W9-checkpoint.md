@@ -1,10 +1,66 @@
 # W9 Implementation Checkpoint
 
 **Work Order:** `spec/work-orders/W9-autonomy-ask.md`
-**State:** `WAITING_FOR_ARCHITECT`
+**State:** `WAITING_FOR_ARCHITECT` (review iteration 2)
 **Branch:** `work/w9-autonomy-ask`
 **Base SHA:** `be97db73fc02d92bc344c61b69975737984f2465`
-**Latest implementation SHA:** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+**Reviewed head (iteration 1):** `7ae1022d7b08e10647d7337f5fe730c49195bde2`
+**Latest implementation SHA (iteration 2):** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+
+## Architect review (iteration 1) — seven findings (F01–F07)
+
+Reviewed exact head `7ae1022d7b08e10647d7337f5fe730c49195bde2`. Correct base,
+five-file scope, CI run #161 green. Seven findings (5 HIGH, 2 MEDIUM) blocked
+merge; all are resolved in iteration 2 on the same PR.
+
+### F01 (HIGH) — Policy ceilings declared but not enforced — RESOLVED
+
+`evaluate_autonomy` now accepts `risk`, `confidence`, `reversible` parameters and
+enforces them against `PolicyCeiling.max_risk`, `.min_confidence`,
+`.require_reversible` before ACT. Each ceiling violation routes to ASK. Tests:
+`test_risk_exceeding_ceiling_routes_to_ask`,
+`test_irreversible_action_routes_to_ask`,
+`test_confidence_below_floor_routes_to_ask`.
+
+### F02 (HIGH) — ACT does not validate complete W7→W8 chain — RESOLVED
+
+ACT now validates: promotion.experiment_id == experiment.id, experiment.
+assurance_result_id == assurance.id, experiment.candidate_id == assurance.
+candidate_id, experiment.base_graph_id/revision/provenance_revision == assurance.
+base_graph_id/revision/provenance_revision. Any mismatch → REJECT. Test:
+`test_act_rejects_promotion_not_bound_to_experiment`.
+
+### F03 (HIGH) — ROLLBACK without verifiable evidence store + ref binding — RESOLVED
+
+ROLLBACK now requires: (1) `known_evidence is not None` (not optional), (2)
+`rollback_path.reference == experiment.rollback_ref` when rollback_ref is non-empty,
+(3) all rollback evidence resolves to SUCCESS in the store. Tests:
+`test_rollback_without_known_evidence_routes_to_ask`,
+`test_rollback_with_mismatched_reference_routes_to_ask`.
+
+### F04 (HIGH) — ACT with no evidence — RESOLVED
+
+ACT now requires non-empty `evidence_ids` and a non-None `known_evidence` store.
+Empty evidence → GATHER_EVIDENCE. Tests:
+`test_act_with_empty_evidence_routes_to_gather_evidence`,
+`test_act_without_known_evidence_store_routes_to_gather_evidence`.
+
+### F05 (MEDIUM) — Truth-state handling — RESOLVED
+
+The specific W4 truth state (UNKNOWN/FAILED/UNAVAILABLE/UNSUPPORTED) is now
+preserved in the decision reason string. The confidence ceiling is enforced.
+Parametrized test: `test_non_success_evidence_states_prevent_act` (×4).
+
+### F06 (MEDIUM) — Non-PASS assurance test — RESOLVED
+
+`test_fail_assurance_rejects_act` now constructs a real non-PASS AssuranceResult
+(using UNKNOWN evidence) and asserts REJECT.
+
+### F07 (MEDIUM) — allowed_actions untyped — RESOLVED
+
+`AutonomyRequest.validate` now checks every `allowed_action` is a real
+`DecisionAction` enum member; arbitrary strings are rejected. Test:
+`test_policy_rejects_non_decision_action_in_allowed_actions`.
 
 ## Dependency proof
 
@@ -74,8 +130,8 @@ Exact-head results:
 
 ```text
 $ python -m pytest
-196 passed in 0.50s
-  tests/test_w9_autonomy.py .................  (17)
+210 passed in 0.56s
+  tests/test_w9_autonomy.py ...............................  (31)
 $ python -m compileall -q src tests
 (clean, no syntax errors)
 ```
@@ -105,7 +161,8 @@ $ python -m compileall -q src tests
 
 ## Architect disposition requested
 
-Review the exact PR head and CI result against the W9 Work Order. On approval,
-merge the reviewed head and reconcile canonical state to W10 eligibility (W10
-depends on W2 + W9; both complete). Worker state: `WAITING_FOR_ARCHITECT`. No
-merge, no self-approval, no successor Work Order creation by this session.
+Review the exact PR head (iteration 2) and CI result against the W9 Work Order
+and the seven iteration-1 findings (F01–F07 — all resolved). On approval, merge
+the reviewed head and reconcile canonical state to W10 eligibility (W10 depends
+on W2 + W9; both complete). Worker state: `WAITING_FOR_ARCHITECT`. No merge,
+no self-approval, no successor Work Order creation by this session.
