@@ -55,6 +55,7 @@ from sos.autonomy import (
     AutonomyRequest,
     PolicyCeiling,
     evaluate_autonomy,
+    validate_decision_transition,
 )
 
 
@@ -1006,3 +1007,44 @@ def test_act_rejects_non_eligible_evaluation():
         evaluation=non_eligible_ev,
     )
     assert result.state == AutonomyDecisionState.REJECT
+
+# --- SOS-W9-F19 regression: C2 state-machine transition contract ---
+
+
+def test_valid_decision_transitions():
+    """SOS-W9-F19: valid state transitions are accepted by validate_decision_transition."""
+    # GATHER_EVIDENCE -> EXPERIMENT, ASK, REJECT, GATHER_EVIDENCE
+    validate_decision_transition(AutonomyDecisionState.GATHER_EVIDENCE, AutonomyDecisionState.EXPERIMENT)
+    validate_decision_transition(AutonomyDecisionState.GATHER_EVIDENCE, AutonomyDecisionState.ASK)
+    validate_decision_transition(AutonomyDecisionState.GATHER_EVIDENCE, AutonomyDecisionState.REJECT)
+    # EXPERIMENT -> ACT, ASK, REJECT, ROLLBACK
+    validate_decision_transition(AutonomyDecisionState.EXPERIMENT, AutonomyDecisionState.ACT)
+    validate_decision_transition(AutonomyDecisionState.EXPERIMENT, AutonomyDecisionState.ROLLBACK)
+    # ASK -> any state (human resolves ambiguity)
+    validate_decision_transition(AutonomyDecisionState.ASK, AutonomyDecisionState.ACT)
+    validate_decision_transition(AutonomyDecisionState.ASK, AutonomyDecisionState.EXPERIMENT)
+    # ACT -> ROLLBACK, ASK
+    validate_decision_transition(AutonomyDecisionState.ACT, AutonomyDecisionState.ROLLBACK)
+    # REJECT -> GATHER_EVIDENCE, ASK
+    validate_decision_transition(AutonomyDecisionState.REJECT, AutonomyDecisionState.GATHER_EVIDENCE)
+    # ROLLBACK -> GATHER_EVIDENCE, ASK
+    validate_decision_transition(AutonomyDecisionState.ROLLBACK, AutonomyDecisionState.GATHER_EVIDENCE)
+
+
+def test_invalid_decision_transitions_rejected():
+    """SOS-W9-F19: invalid state transitions are rejected by validate_decision_transition."""
+    # ACT -> EXPERIMENT is not valid (ACT is terminal except for rollback)
+    with pytest.raises(ModelValidationError, match="invalid decision state transition"):
+        validate_decision_transition(AutonomyDecisionState.ACT, AutonomyDecisionState.EXPERIMENT)
+    # ACT -> GATHER_EVIDENCE is not valid
+    with pytest.raises(ModelValidationError, match="invalid decision state transition"):
+        validate_decision_transition(AutonomyDecisionState.ACT, AutonomyDecisionState.GATHER_EVIDENCE)
+    # REJECT -> ACT is not valid (must go through ASK or GATHER_EVIDENCE first)
+    with pytest.raises(ModelValidationError, match="invalid decision state transition"):
+        validate_decision_transition(AutonomyDecisionState.REJECT, AutonomyDecisionState.ACT)
+    # REJECT -> EXPERIMENT is not valid
+    with pytest.raises(ModelValidationError, match="invalid decision state transition"):
+        validate_decision_transition(AutonomyDecisionState.REJECT, AutonomyDecisionState.EXPERIMENT)
+    # ROLLBACK -> ACT is not valid
+    with pytest.raises(ModelValidationError, match="invalid decision state transition"):
+        validate_decision_transition(AutonomyDecisionState.ROLLBACK, AutonomyDecisionState.ACT)

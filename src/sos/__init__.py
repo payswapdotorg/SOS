@@ -78,6 +78,7 @@ from .autonomy import (
     AutonomyRequest,
     PolicyCeiling,
     evaluate_autonomy,
+    validate_decision_transition,
 )
 from .model import (
     AskPayload,

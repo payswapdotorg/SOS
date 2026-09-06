@@ -59,6 +59,59 @@ class AutonomyDecisionState(str, Enum):
 
 
 # ---------------------------------------------------------------------------
+# SOS-W9-F19: Explicit transition contract (C2 state machine)
+# ---------------------------------------------------------------------------
+
+# Valid direct transitions FROM -> {allowed TO states}
+_VALID_DECISION_TRANSITIONS: dict[AutonomyDecisionState, frozenset[AutonomyDecisionState]] = {
+    AutonomyDecisionState.GATHER_EVIDENCE: frozenset({
+        AutonomyDecisionState.EXPERIMENT, AutonomyDecisionState.ASK,
+        AutonomyDecisionState.REJECT, AutonomyDecisionState.GATHER_EVIDENCE,
+    }),
+    AutonomyDecisionState.EXPERIMENT: frozenset({
+        AutonomyDecisionState.ACT, AutonomyDecisionState.ASK,
+        AutonomyDecisionState.REJECT, AutonomyDecisionState.ROLLBACK,
+        AutonomyDecisionState.GATHER_EVIDENCE,
+    }),
+    AutonomyDecisionState.ASK: frozenset({
+        AutonomyDecisionState.GATHER_EVIDENCE, AutonomyDecisionState.EXPERIMENT,
+        AutonomyDecisionState.ACT, AutonomyDecisionState.REJECT,
+        AutonomyDecisionState.ROLLBACK, AutonomyDecisionState.ASK,
+    }),
+    AutonomyDecisionState.ACT: frozenset({
+        AutonomyDecisionState.ROLLBACK, AutonomyDecisionState.ASK,
+    }),
+    AutonomyDecisionState.REJECT: frozenset({
+        AutonomyDecisionState.GATHER_EVIDENCE, AutonomyDecisionState.ASK,
+        AutonomyDecisionState.REJECT,
+    }),
+    AutonomyDecisionState.ROLLBACK: frozenset({
+        AutonomyDecisionState.GATHER_EVIDENCE, AutonomyDecisionState.ASK,
+        AutonomyDecisionState.ROLLBACK,
+    }),
+}
+
+
+def validate_decision_transition(
+    from_state: AutonomyDecisionState,
+    to_state: AutonomyDecisionState,
+) -> None:
+    """Validate that a state transition is allowed by the C2 state machine (F19).
+
+    Raises ``ModelValidationError`` for invalid transitions.
+    """
+    if not isinstance(from_state, AutonomyDecisionState):
+        raise ModelValidationError(f"from_state must be an AutonomyDecisionState, got {from_state!r}")
+    if not isinstance(to_state, AutonomyDecisionState):
+        raise ModelValidationError(f"to_state must be an AutonomyDecisionState, got {to_state!r}")
+    allowed = _VALID_DECISION_TRANSITIONS.get(from_state, frozenset())
+    if to_state not in allowed:
+        raise ModelValidationError(
+            f"invalid decision state transition: {from_state.value} -> {to_state.value}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Policy ceiling + autonomy request (policy)
 # ---------------------------------------------------------------------------
 
