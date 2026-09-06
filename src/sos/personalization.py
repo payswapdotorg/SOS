@@ -220,35 +220,61 @@ def select_policy(
 ) -> PolicySelection:
     """Select among declared policy/candidate alternatives against context (F04).
 
-    Deterministic: selects the first alternative (by priority, then by id) whose
-    selector dimensions are all SUCCESS. If W9 decision state is not ACT, returns
-    the first alternative but preserves the W9 state (does not widen to ACT).
-    If no alternative has resolved context, selects the highest-priority one and
-    narrows to ASK.
+    SOS-W10-F04: deterministically evaluates each declared alternative against the
+    supplied contextual selector. An alternative is context-compatible when its
+    own ``PolicyAlternative.selector`` dimensions are all SUCCESS. Among
+    context-compatible alternatives, selects by (priority, id). If no alternative
+    is context-compatible, selects the highest-priority one and narrows to ASK.
+    W9 state is inherited and may only narrow.
     """
     if not alternatives:
         raise ModelValidationError("select_policy requires at least one alternative")
     selector.validate()
 
-    # Sort by priority, then by id for deterministic ordering
-    sorted_alts = sorted(alternatives, key=lambda a: (a.priority, a.id))
+    # Evaluate each alternative's own selector against SUCCESS context
+    compatible: list[PolicyAlternative] = []
+    incompatible: list[PolicyAlternative] = []
+    for alt in alternatives:
+        # PolicyAlternative.__post_init__ already validates; just check context
+        all_resolved = all(
+            d.value.state == TruthState.SUCCESS
+            for d in alt.selector.dimensions
+        )
+        if all_resolved:
+            compatible.append(alt)
+        else:
+            incompatible.append(alt)
 
-    selected = sorted_alts[0]
     state = w9_decision_state.value
 
-    # Check if the selector has any unresolved context dimensions
+    if compatible:
+        # Sort compatible alternatives by (priority, id) for deterministic selection
+        compatible.sort(key=lambda a: (a.priority, a.id))
+        selected = compatible[0]
+        rationale = (
+            f"selected alternative '{selected.id}' (priority {selected.priority}); "
+            f"context-compatible; {len(compatible)} compatible of {len(alternatives)} evaluated; "
+            f"W9 state {w9_decision_state.value} preserved"
+        )
+    else:
+        # No context-compatible alternative — select highest-priority and narrow to ASK
+        sorted_alts = sorted(alternatives, key=lambda a: (a.priority, a.id))
+        selected = sorted_alts[0]
+        state = AutonomyDecisionState.ASK.value
+        rationale = (
+            f"selected alternative '{selected.id}' (priority {selected.priority}); "
+            f"no context-compatible alternative; narrowed to ASK; "
+            f"{len(alternatives)} evaluated"
+        )
+
+    # Also check the top-level selector for unresolved context
     has_unresolved = any(
         d.value.state in (TruthState.UNKNOWN, TruthState.UNAVAILABLE, TruthState.UNSUPPORTED)
         for d in selector.dimensions
     )
     if has_unresolved:
         state = AutonomyDecisionState.ASK.value
-
-    rationale = (
-        f"selected alternative '{selected.id}' (priority {selected.priority}); W9 state {w9_decision_state.value} preserved"
-        if not has_unresolved
-        else f"selected alternative '{selected.id}' (priority {selected.priority}); unresolved context narrowed to ASK"
-    )
+        rationale += "; top-level selector has unresolved context; ASK"
 
     return PolicySelection(
         selected_id=selected.id,

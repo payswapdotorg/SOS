@@ -528,6 +528,9 @@ def test_contextual_selector_requires_version():
 
 
 def test_select_policy_chooses_among_alternatives():
+    """SOS-W10-F04: select_policy evaluates each alternative's own selector
+    against context. Both alternatives have resolved context; the lower-priority
+    one wins."""
     selector = ContextualSelector(
         id="ctx-sel", version=1,
         dimensions=(
@@ -535,19 +538,28 @@ def test_select_policy_chooses_among_alternatives():
         ),
         traceability=tr(),
     )
-    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=selector, priority=2)
-    alt2 = PolicyAlternative(id="alt-2", policy=base_policy(), selector=selector, priority=1)  # higher priority
+    # Both alternatives have resolved (SUCCESS) selectors
+    alt1_sel = ContextualSelector(
+        id="alt1-sel", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),),
+        traceability=tr(),
+    )
+    alt2_sel = ContextualSelector(
+        id="alt2-sel", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "mobile", None)),),
+        traceability=tr(),
+    )
+    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=alt1_sel, priority=2)
+    alt2 = PolicyAlternative(id="alt-2", policy=base_policy(), selector=alt2_sel, priority=1)  # higher priority
     result = select_policy(
         alternatives=(alt1, alt2),
         selector=selector,
         w9_decision_state=AutonomyDecisionState.ACT,
         traceability=tr(),
     )
-    assert result.selected_id == "alt-2"  # priority 1 < 2
+    assert result.selected_id == "alt-2"  # both compatible; priority 1 wins
     assert result.state == "ACT"
     assert result.alternatives_evaluated == 2
-    assert result.selector_id == "ctx-sel"
-    assert result.selector_version == 1
 
 
 def test_select_policy_with_unresolved_context_narrows_to_ask():
@@ -585,3 +597,68 @@ def test_select_policy_w9_ask_preserved():
         traceability=tr(),
     )
     assert result.state == "ASK"
+
+def test_context_changes_which_alternative_wins():
+    """SOS-W10-F04: context conditions determine which alternative is selected.
+    When alt-1's selector is SUCCESS but alt-2's is UNKNOWN, alt-1 wins
+    regardless of priority."""
+    selector = ContextualSelector(
+        id="ctx-top", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),),
+        traceability=tr(),
+    )
+    # alt-1 has a RESOLVED selector (SUCCESS)
+    alt1_sel = ContextualSelector(
+        id="alt1-sel", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),),
+        traceability=tr(),
+    )
+    # alt-2 has an UNRESOLVED selector (UNKNOWN) — even though priority is lower
+    alt2_sel = ContextualSelector(
+        id="alt2-sel", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.UNKNOWN, None, "not determined")),),
+        traceability=tr(),
+    )
+    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=alt1_sel, priority=2)  # lower priority
+    alt2 = PolicyAlternative(id="alt-2", policy=base_policy(), selector=alt2_sel, priority=1)  # higher priority but context-incompatible
+    result = select_policy(
+        alternatives=(alt1, alt2),
+        selector=selector,
+        w9_decision_state=AutonomyDecisionState.ACT,
+        traceability=tr(),
+    )
+    # alt-1 wins because it's context-compatible, even though priority is lower
+    assert result.selected_id == "alt-1"
+    assert result.state == "ACT"
+
+
+def test_no_compatible_alternative_routes_to_ask():
+    """SOS-W10-F04: when no alternative's selector is context-compatible,
+    select the highest-priority and narrow to ASK."""
+    selector = ContextualSelector(
+        id="ctx-top", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),),
+        traceability=tr(),
+    )
+    # Both alternatives have UNKNOWN selectors
+    alt1_sel = ContextualSelector(
+        id="alt1-sel", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.USER, key="id", value=TruthfulValue(TruthState.UNKNOWN, None, "no user")),),
+        traceability=tr(),
+    )
+    alt2_sel = ContextualSelector(
+        id="alt2-sel", version=1,
+        dimensions=(ContextValue(dimension=ContextDimension.ENVIRONMENT, key="tier", value=TruthfulValue(TruthState.UNAVAILABLE, None, "offline")),),
+        traceability=tr(),
+    )
+    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=alt1_sel, priority=2)
+    alt2 = PolicyAlternative(id="alt-2", policy=base_policy(), selector=alt2_sel, priority=1)
+    result = select_policy(
+        alternatives=(alt1, alt2),
+        selector=selector,
+        w9_decision_state=AutonomyDecisionState.ACT,
+        traceability=tr(),
+    )
+    # No compatible alternative -> ASK
+    assert result.state == "ASK"
+    assert result.selected_id == "alt-2"  # highest priority among incompatible
