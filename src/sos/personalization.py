@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from .model import ModelValidationError, Traceability, TruthState, TruthfulValue, ContextDimension, ContextValue, DecisionAction
+from .autonomy import AutonomyDecisionState
 
 if TYPE_CHECKING:
-    from .autonomy import AutonomyRequest, PolicyCeiling, AutonomyDecisionState
+    from .autonomy import AutonomyRequest, PolicyCeiling
 
 
 # ---------------------------------------------------------------------------
@@ -156,9 +157,14 @@ def evaluate_personalization(
     policy: "AutonomyRequest",
     selector: ContextualSelector,
     traceability: Traceability,
+    w9_decision_state: AutonomyDecisionState = AutonomyDecisionState.ASK,
 ) -> PersonalizationDecision:
-    """Evaluate a personalization decision deterministically (C4, C9).
+    """Evaluate a personalization decision deterministically (C3, C4, C9).
 
+    - C3 (SOS-W10-F01): inherits the W9 decision state; resolved context may
+      narrow an already-authorized option (ACT) but CANNOT turn ASK/REJECT into
+      ACT. The personalization state starts as the W9 decision state and can
+      only be narrowed (never widened).
     - C4: unknown/unavailable context routes to ASK.
     - C9: same inputs produce same outputs.
     """
@@ -166,17 +172,22 @@ def evaluate_personalization(
     selector.validate()
     reasons: list[str] = []
     context_refs: list[str] = []
-    state = "ACT"  # default: context allows acting
+
+    # SOS-W10-F01: inherit W9 decision state. Personalization may only narrow.
+    state = w9_decision_state.value
+    reasons.append(f"inherited W9 decision state: {state}")
 
     for d in selector.dimensions:
         context_refs.append(f"{d.dimension.value}:{d.key}")
         if d.value.state in (TruthState.UNKNOWN, TruthState.UNAVAILABLE, TruthState.UNSUPPORTED):
-            state = "ASK"
-            reasons.append(f"context '{d.key}' state is {d.value.state.value}; ASK")
+            # C4: unresolved context narrows to ASK (never widens to ACT)
+            if state != AutonomyDecisionState.ASK.value:
+                state = AutonomyDecisionState.ASK.value
+            reasons.append(f"context '{d.key}' state is {d.value.state.value}; narrowed to ASK")
 
-    if state == "ACT":
-        reasons.append("all context dimensions resolved")
-    rationale = "personalization authorized" if state == "ACT" else "unresolved context; ASK"
+    if state == AutonomyDecisionState.ACT.value:
+        reasons.append("all context dimensions resolved; W9 ACT preserved")
+    rationale = "personalization authorized within W9 boundary" if state == AutonomyDecisionState.ACT.value else f"personalization narrowed to {state} by W9 boundary or context"
 
     return PersonalizationDecision(
         id="",

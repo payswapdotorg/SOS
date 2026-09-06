@@ -153,8 +153,9 @@ def test_missing_context_routes_to_ask():
             ),
         ),
         traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,  # W9 says ACT, but context is unknown -> ASK
     )
-    assert decision.state == AutonomyDecisionState.ASK
+    assert decision.state == "ASK"
 
 
 def test_unavailable_context_routes_to_ask():
@@ -166,8 +167,9 @@ def test_unavailable_context_routes_to_ask():
             ),
         ),
         traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,  # W9 says ACT, but context unavailable -> ASK
     )
-    assert decision.state == AutonomyDecisionState.ASK
+    assert decision.state == "ASK"
 
 
 # --- C5: platform-neutral adapter interface ---
@@ -260,6 +262,7 @@ def test_personalization_decision_records_context_and_policy_refs():
             ),
         ),
         traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,
     )
     assert decision.policy_id == "policy-1"
     assert len(decision.context_refs) > 0
@@ -275,8 +278,8 @@ def test_personalization_is_deterministic():
             ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
         ),
     )
-    d1 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr())
-    d2 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr())
+    d1 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr(), w9_decision_state=AutonomyDecisionState.ACT)
+    d2 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr(), w9_decision_state=AutonomyDecisionState.ACT)
     assert d1.state == d2.state
     assert d1.id == d2.id
 
@@ -293,6 +296,7 @@ def test_decision_round_trips_through_json(tmp_path):
             ),
         ),
         traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,
     )
     p = tmp_path / "personalization.json"
     JsonModelStore(p).save(decision)
@@ -352,3 +356,65 @@ def test_platform_surface_covers_frozen_vocabulary():
     assert "tv" in surfaces
     assert "cross-platform" in surfaces
     assert "other" in surfaces
+
+# --- SOS-W10-F01 regression: W9 decision state inheritance ---
+
+
+def test_w9_ask_cannot_become_act():
+    """SOS-W10-F01: a W9 ASK decision cannot become ACT even with resolved context."""
+    decision = evaluate_personalization(
+        policy=base_policy(),
+        selector=ContextualSelector(
+            dimensions=(
+                ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+            ),
+        ),
+        traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ASK,
+    )
+    assert decision.state == "ASK"
+
+
+def test_w9_reject_cannot_become_act():
+    """SOS-W10-F01: a W9 REJECT decision cannot become ACT even with resolved context."""
+    decision = evaluate_personalization(
+        policy=base_policy(),
+        selector=ContextualSelector(
+            dimensions=(
+                ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+            ),
+        ),
+        traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.REJECT,
+    )
+    assert decision.state == "REJECT"
+
+
+def test_w9_act_with_resolved_context_preserves_act():
+    """SOS-W10-F01: a W9 ACT decision with resolved context preserves ACT."""
+    decision = evaluate_personalization(
+        policy=base_policy(),
+        selector=ContextualSelector(
+            dimensions=(
+                ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+            ),
+        ),
+        traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,
+    )
+    assert decision.state == "ACT"
+
+
+def test_w9_act_with_unknown_context_narrows_to_ask():
+    """SOS-W10-F01: a W9 ACT decision with unknown context narrows to ASK."""
+    decision = evaluate_personalization(
+        policy=base_policy(),
+        selector=ContextualSelector(
+            dimensions=(
+                ContextValue(dimension=ContextDimension.USER, key="id", value=TruthfulValue(TruthState.UNKNOWN, None, "no user")),
+            ),
+        ),
+        traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,
+    )
+    assert decision.state == "ASK"

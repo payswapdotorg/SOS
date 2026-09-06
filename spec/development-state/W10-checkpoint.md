@@ -1,7 +1,7 @@
 # W10 Implementation Checkpoint
 
 **Work Order:** `spec/work-orders/W10-personalization-platform.md`
-**State:** `WAITING_FOR_ARCHITECT`
+**State:** `WAITING_FOR_ARCHITECT (review iteration 2)`
 **Branch:** `work/w10-personalization-platform`
 **Base SHA:** `d2b813eb32085fdc5e12180da5f2f141b13036e7`
 **Latest implementation SHA:** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
@@ -61,8 +61,8 @@ Exact-head results:
 
 ```text
 $ python -m pytest
-244 passed in 0.58s
-  tests/test_w10_personalization_platform.py ...................  (19)
+248 passed in 0.62s
+  tests/test_w10_personalization_platform.py .......................  (23)
 $ python -m compileall -q src tests
 (clean, no syntax errors)
 ```
@@ -85,4 +85,4 @@ $ python -m compileall -q src tests
 
 Review the exact PR head and CI result against the W10 Work Order. On approval,
 merge and reconcile canonical state to W11 eligibility. Worker state:
-`WAITING_FOR_ARCHITECT`. No merge, no self-approval, no successor Work Order.
+`WAITING_FOR_ARCHITECT (review iteration 2)`. No merge, no self-approval, no successor Work Order.
