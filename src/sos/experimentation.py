@@ -186,7 +186,8 @@ class Experiment:
         if not self.stop_conditions:
             raise ModelValidationError("Experiment.stop_conditions is required (C5)")
         self.traceability.validate(require_value=True, require_context=True)
-        # C1: if known_assurance supplied, candidate/assurance/graph must match.
+        # C1 (SOS-W8-F01): if known_assurance supplied, candidate/assurance/graph
+        # AND base_graph_revision AND provenance_revision must all match exactly.
         if known_assurance is not None:
             if self.candidate_id != known_assurance.candidate_id:
                 raise ModelValidationError(
@@ -199,6 +200,14 @@ class Experiment:
             if self.base_graph_id != known_assurance.base_graph_id:
                 raise ModelValidationError(
                     f"Experiment.base_graph_id '{self.base_graph_id}' does not match assurance result's graph '{known_assurance.base_graph_id}'"
+                )
+            if self.base_graph_revision != known_assurance.base_graph_revision:
+                raise ModelValidationError(
+                    f"Experiment.base_graph_revision '{self.base_graph_revision}' does not match assurance result's revision '{known_assurance.base_graph_revision}'"
+                )
+            if self.provenance_revision != known_assurance.provenance_revision:
+                raise ModelValidationError(
+                    f"Experiment.provenance_revision '{self.provenance_revision}' does not match assurance result's provenance revision '{known_assurance.provenance_revision}'"
                 )
 
 
@@ -322,25 +331,43 @@ def evaluate_experiment(
     experiment: Experiment,
     *,
     known_evidence: dict[str, Any],
+    evidence_refs: tuple[str, ...] = (),
     evaluation_success: bool = False,
     stop_trigger: tuple[str, ...] = (),
     known_assurance: "AssuranceResult | None" = None,
+    rollback_path: "RollbackPath | None" = None,
 ) -> ExperimentEvaluation:
     """Evaluate an experiment's observed evidence truthfully (C4, C5, C9).
 
-    - C4: evidence truth states are preserved; UNKNOWN/FAILED/UNAVAILABLE
-      evidence cannot produce promotion eligibility.
+    - C4 (SOS-W8-F04): only the explicitly declared ``evidence_refs`` participate
+      in promotion gating; each is validated against ``known_evidence``; unrelated
+      evidence does not affect eligibility. Truth states are preserved; UNKNOWN/
+      FAILED/UNAVAILABLE evidence cannot produce promotion eligibility.
     - C5: a fired stop condition stops the experiment and cannot be offset by
       favorable objectives.
-    - C7: promotion eligibility requires rollback or a documented containment
-      exception.
+    - C7 (SOS-W8-F02): promotion eligibility requires a validated governed
+      ``RollbackPath`` (its evidence ids resolve + are SUCCESS) or a documented
+      containment exception — not an arbitrary non-empty ``rollback_ref`` string.
     - C9: objectives are preserved (no scalar).
     """
     experiment.validate()
+    # SOS-W8-F04: explicit evidence reference set. If evidence_refs is empty,
+    # no evidence participates (all_success stays True vacuously, but
+    # promotion_eligible also requires evaluation_success which the caller must
+    # supply). Unrelated evidence in known_evidence is ignored.
+    if evidence_refs is None:
+        evidence_refs = ()
     evidence_ids: list[str] = []
     evidence_results: dict[str, TruthState] = {}
     all_success = True
-    for eid, ev in known_evidence.items():
+    for eid in evidence_refs:
+        ev = known_evidence.get(eid)
+        if ev is None:
+            # Unknown referenced evidence id — cannot produce PASS (C4).
+            evidence_ids.append(eid)
+            evidence_results[eid] = TruthState.UNKNOWN
+            all_success = False
+            continue
         evidence_ids.append(eid)
         state = ev.result.state if hasattr(ev, "result") else TruthState.UNKNOWN
         evidence_results[eid] = state
@@ -350,10 +377,27 @@ def evaluate_experiment(
     # C5: hard stop conditions fire — cannot be offset by objectives.
     stopped = len(stop_trigger) > 0
 
-    # C7: rollback or documented containment exception required for eligibility.
-    has_rollback = bool(experiment.rollback_ref and experiment.rollback_ref.strip())
-    has_containment = experiment.containment_policy_ref is not None and experiment.containment_policy_ref.strip() != ""
-    recovery_satisfied = has_rollback or has_containment
+    # SOS-W8-F02: recovery must be backed by a validated governed RollbackPath
+    # (its evidence ids resolve to known SUCCESS records) or a documented
+    # containment exception. An arbitrary non-empty rollback_ref string is NOT
+    # sufficient.
+    recovery_satisfied = False
+    if rollback_path is not None:
+        # Validate the rollback path against known evidence.
+        try:
+            rollback_path.validate(known_evidence=known_evidence)
+        except ModelValidationError:
+            recovery_satisfied = False
+        else:
+            # All rollback evidence must be SUCCESS.
+            recovery_satisfied = all(
+                known_evidence.get(eid) is not None
+                and getattr(known_evidence[eid], "result", None) is not None
+                and known_evidence[eid].result.state == TruthState.SUCCESS
+                for eid in rollback_path.evidence_ids
+            )
+    if not recovery_satisfied and experiment.containment_policy_ref is not None and experiment.containment_policy_ref.strip() != "":
+        recovery_satisfied = True  # documented containment exception
 
     # C4 + C6: promotion eligibility requires: evaluation_success + all evidence
     # SUCCESS + no hard stop + recovery satisfied.
@@ -370,7 +414,7 @@ def evaluate_experiment(
     if not all_success:
         detail_parts.append("non-SUCCESS evidence present")
     if not recovery_satisfied:
-        detail_parts.append("no rollback or documented containment exception")
+        detail_parts.append("no validated rollback path or documented containment exception")
     if evaluation_success and all_success and not stopped and recovery_satisfied:
         detail_parts.append("promotion eligible")
     elif evaluation_success and all_success and not stopped and not recovery_satisfied:
@@ -427,6 +471,12 @@ class PromotionGate:
         known_assurance: "AssuranceResult",
     ) -> PromotionDecision:
         experiment.validate(known_assurance=known_assurance)
+        # SOS-W8-F03: the evaluation must be bound to the exact experiment under
+        # review. A promotion decision cannot consume an unrelated evaluation.
+        if evaluation.experiment_id != experiment.id:
+            raise ModelValidationError(
+                f"PromotionGate: evaluation.experiment_id '{evaluation.experiment_id}' does not match experiment '{experiment.id}'"
+            )
         # C2: assurance must be PASS.
         if known_assurance.status.value != "PASS":
             return PromotionDecision(

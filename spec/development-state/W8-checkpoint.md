@@ -1,10 +1,66 @@
 # W8 Implementation Checkpoint
 
 **Work Order:** `spec/work-orders/W8-experiment-promotion-rollback.md`
-**State:** `WAITING_FOR_ARCHITECT`
+**State:** `WAITING_FOR_ARCHITECT` (review iteration 2)
 **Branch:** `work/w8-experiment-promotion-rollback`
 **Base SHA:** `7fefc148456167a4d7f8cd89675f5d32fe4e10bb`
-**Latest implementation SHA:** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+**Reviewed head (iteration 1):** `69b68f9ad41ae5a242cc28ef5f4606df45fb1d80`
+**Latest implementation SHA (iteration 2):** recorded as the PR `head.sha` (authoritative review head per `ARCHITECT-REVIEW-PROTOCOL §2`)
+
+## Architect review (iteration 1) — four HIGH findings
+
+Reviewed exact head `69b68f9ad41ae5a242cc28ef5f4606df45fb1d80`. Base matched
+live main; five-file W8 surface; 164 tests + compileall; lifecycle direction
+sound. Four HIGH findings blocked merge; all are resolved in iteration 2 on the
+same PR.
+
+### SOS-W8-F01 — HIGH — exact revision/provenance binding incomplete — RESOLVED
+
+Finding: `Experiment.validate(known_assurance=…)` checked candidate_id,
+assurance_result_id, and base_graph_id but not `base_graph_revision` or
+`provenance_revision` against the W7 result. A caller could construct an
+experiment with mismatched revision/provenance and pass validation.
+
+Resolution: `Experiment.validate` now enforces exact equality of
+`base_graph_revision` and `provenance_revision` against the originating
+`AssuranceResult` (in addition to candidate_id, assurance_result_id,
+base_graph_id). Regression tests: `test_experiment_rejects_mismatched_base_graph_revision`,
+`test_experiment_rejects_mismatched_provenance_revision`.
+
+### SOS-W8-F02 — HIGH — rollback eligibility satisfied by arbitrary string — RESOLVED
+
+Finding: `rollback_ref` was only a string; `evaluate_experiment()` set
+`recovery_satisfied = bool(rollback_ref.strip())` — any non-empty string
+satisfied C7 without validating a `RollbackPath`.
+
+Resolution: `evaluate_experiment` now accepts a caller-supplied `rollback_path:
+RollbackPath | None`; recovery is satisfied only when the `RollbackPath` validates
+against `known_evidence` AND all its evidence records are SUCCESS, or when a
+documented `containment_policy_ref` is present. An arbitrary `rollback_ref` string
+no longer satisfies recovery. Regression tests: `test_bogus_rollback_ref_cannot_satisfy_recovery`,
+`test_validated_rollback_path_satisfies_recovery`, `test_non_success_rollback_evidence_blocks_promotion`.
+
+### SOS-W8-F03 — HIGH — promotion can accept unrelated evaluation — RESOLVED
+
+Finding: `PromotionGate.evaluate()` never validated `evaluation.experiment_id ==
+experiment.id`; a promotion decision could consume an unrelated evaluation.
+
+Resolution: `PromotionGate.evaluate` now raises `ModelValidationError` if
+`evaluation.experiment_id != experiment.id`. Regression test:
+`test_promotion_gate_rejects_evaluation_not_bound_to_experiment`.
+
+### SOS-W8-F04 — HIGH — evaluation scope not explicit enough — RESOLVED
+
+Finding: `evaluate_experiment()` iterated every entry in `known_evidence`, not a
+declared set; eligibility depended on unrelated records; unknown evidence ids were
+not rejected because there was no declared reference set.
+
+Resolution: `evaluate_experiment` now accepts an explicit `evidence_refs:
+tuple[str, …]` parameter; only those records participate in promotion gating.
+Each is validated against `known_evidence`; unknown refs are treated as UNKNOWN
+and block promotion. Unrelated evidence in `known_evidence` is ignored. Regression
+tests: `test_unrelated_evidence_does_not_affect_promotion`,
+`test_unknown_referenced_evidence_id_blocks_promotion`.
 
 ## Dependency proof
 
@@ -86,7 +142,7 @@ Exact-head results (recorded in the PR description at push time):
 
 ```text
 $ python -m pytest
-164 passed in 0.48s
+172 passed in 0.45s
   tests/test_w1_models.py  ........   (8)
   tests/test_w2_graph.py   ........   (8)
   tests/test_w3_recovery.py .................... (20)
@@ -94,10 +150,14 @@ $ python -m pytest
   tests/test_w5_causal.py  ..........................  (26)
   tests/test_w6_candidates.py ........................  (24)
   tests/test_w7_assurance.py ............................  (28)
-  tests/test_w8_experimentation.py .........................  (25)
+  tests/test_w8_experimentation.py .................................  (33)
 $ python -m compileall -q src tests
 (clean, no syntax errors)
 ```
+
+Iteration 1 (head `69b68f9`) was 164 tests (25 W8); iteration 2 adds 8 F01-F04
+regression tests -> 172 total (33 W8). CI on iteration 1 ran `pytest` -> `success`;
+iteration 2 CI re-runs on the corrected head.
 
 ## Known limitations
 
@@ -130,7 +190,9 @@ $ python -m compileall -q src tests
 
 ## Architect disposition requested
 
-Review the exact PR head and CI result against the W8 Work Order. On approval,
-merge the reviewed head and reconcile canonical state to W9 eligibility (W9
-depends on W7 + W8; W7 is complete). Worker state: `WAITING_FOR_ARCHITECT`. No
-merge, no self-approval, no successor Work Order creation by this session.
+Review the exact PR head (iteration 2) and CI result against the W8 Work Order
+and the four iteration-1 findings (SOS-W8-F01 through SOS-W8-F04 — all
+resolved). On approval, merge the reviewed head and reconcile canonical state
+to W9 eligibility (W9 depends on W7 + W8; W7 is complete). Worker state:
+`WAITING_FOR_ARCHITECT`. No merge, no self-approval, no successor Work Order
+creation by this session.
