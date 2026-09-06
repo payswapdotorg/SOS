@@ -84,7 +84,10 @@ from .personalization import (
     ContextualPolicy,
     ContextualSelector,
     PersonalizationDecision,
+    PolicyAlternative,
+    PolicySelection,
     evaluate_personalization,
+    select_policy,
 )
 from .platform import (
     AdapterCapability,

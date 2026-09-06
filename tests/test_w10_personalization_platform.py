@@ -27,7 +27,10 @@ from sos.personalization import (
     ContextualPolicy,
     ContextualSelector,
     PersonalizationDecision,
+    PolicyAlternative,
+    PolicySelection,
     evaluate_personalization,
+    select_policy,
 )
 from sos.platform import (
     AdapterCapability,
@@ -65,10 +68,12 @@ def base_policy() -> AutonomyRequest:
 
 def test_contextual_selector_has_typed_dimensions_and_truth_states():
     cs = ContextualSelector(
+        id="ctx-test", version=1,
         dimensions=(
             ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ContextValue(dimension=ContextDimension.ENVIRONMENT, key="tier", value=TruthfulValue(TruthState.SUCCESS, "production", None)),
         ),
+        traceability=tr(),
     )
     cs.validate()
     assert len(cs.dimensions) == 2
@@ -76,9 +81,11 @@ def test_contextual_selector_has_typed_dimensions_and_truth_states():
 
 def test_unknown_context_value_remains_distinct():
     cs = ContextualSelector(
+        id="ctx-1", version=1,
         dimensions=(
             ContextValue(dimension=ContextDimension.CUSTOM, key="feature", value=TruthfulValue(TruthState.UNKNOWN, None, "not determined")),
         ),
+        traceability=tr(),
     )
     cs.validate()
     assert cs.dimensions[0].value.state == TruthState.UNKNOWN
@@ -92,9 +99,11 @@ def test_contextual_policy_selects_based_on_context():
         id="ctx-policy-1", version=1,
         source_policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-1", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ),
+            traceability=tr(),
         ),
         narrowed_allowed_actions=(DecisionAction.ACT,),  # subset of source
         narrowed_ceilings=PolicyCeiling(
@@ -116,7 +125,7 @@ def test_contextual_policy_cannot_expand_allowed_actions():
         ContextualPolicy(
             id="bad", version=1,
             source_policy=base_policy(),  # no ROLLBACK
-            selector=ContextualSelector(dimensions=()),
+            selector=ContextualSelector(id="ctx-empty", version=1, dimensions=(), traceability=tr()),
             narrowed_allowed_actions=(DecisionAction.ACT, DecisionAction.ROLLBACK),  # ROLLBACK not in source
             narrowed_ceilings=base_policy().ceilings,
             traceability=tr(),
@@ -128,7 +137,7 @@ def test_contextual_policy_cannot_relax_ceilings():
         ContextualPolicy(
             id="bad", version=1,
             source_policy=base_policy(),  # max_risk=0.3
-            selector=ContextualSelector(dimensions=()),
+            selector=ContextualSelector(id="ctx-empty", version=1, dimensions=(), traceability=tr()),
             narrowed_allowed_actions=(DecisionAction.ACT,),
             narrowed_ceilings=PolicyCeiling(
                 max_risk=0.5,  # relaxed (0.5 > 0.3)
@@ -148,12 +157,15 @@ def test_missing_context_routes_to_ask():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-auto", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.USER, key="id", value=TruthfulValue(TruthState.UNKNOWN, None, "no user context")),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
-        w9_decision_state=AutonomyDecisionState.ACT,  # W9 says ACT, but context is unknown -> ASK
+        w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-1",
     )
     assert decision.state == "ASK"
 
@@ -162,12 +174,15 @@ def test_unavailable_context_routes_to_ask():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-auto", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.ENVIRONMENT, key="tier", value=TruthfulValue(TruthState.UNAVAILABLE, None, "environment data offline")),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
-        w9_decision_state=AutonomyDecisionState.ACT,  # W9 says ACT, but context unavailable -> ASK
+        w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-1",
     )
     assert decision.state == "ASK"
 
@@ -236,7 +251,7 @@ def test_platform_constraints_narrow_not_widen():
     cp = ContextualPolicy(
         id="ctx-1", version=1,
         source_policy=base_policy(),  # max_risk=0.3, max_blast=service
-        selector=ContextualSelector(dimensions=()),
+        selector=ContextualSelector(id="ctx-empty", version=1, dimensions=(), traceability=tr()),
         narrowed_allowed_actions=(DecisionAction.ACT,),
         narrowed_ceilings=PolicyCeiling(
             max_risk=0.1,  # narrower
@@ -257,16 +272,26 @@ def test_personalization_decision_records_context_and_policy_refs():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-1", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
         w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-1",
+        evidence_ids=("ev-1",),
+        alternatives=("alt-1",),
+        constraints=("preserve-safety",),
     )
     assert decision.policy_id == "policy-1"
     assert len(decision.context_refs) > 0
     assert decision.traceability.context_ref == "context:1"
+    assert decision.w9_decision_id == "w9-dec-1"
+    assert "ev-1" in decision.evidence_ids
+    assert "alt-1" in decision.alternatives
+    assert "preserve-safety" in decision.constraints
 
 
 # --- C9: deterministic evaluation ---
@@ -274,12 +299,14 @@ def test_personalization_decision_records_context_and_policy_refs():
 
 def test_personalization_is_deterministic():
     selector = ContextualSelector(
+        id="ctx-det", version=1,
         dimensions=(
             ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
         ),
+        traceability=tr(),
     )
-    d1 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr(), w9_decision_state=AutonomyDecisionState.ACT)
-    d2 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr(), w9_decision_state=AutonomyDecisionState.ACT)
+    d1 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr(), w9_decision_state=AutonomyDecisionState.ACT, w9_decision_id="w9-1")
+    d2 = evaluate_personalization(policy=base_policy(), selector=selector, traceability=tr(), w9_decision_state=AutonomyDecisionState.ACT, w9_decision_id="w9-1")
     assert d1.state == d2.state
     assert d1.id == d2.id
 
@@ -291,12 +318,18 @@ def test_decision_round_trips_through_json(tmp_path):
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-1", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
         w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-1",
+        evidence_ids=("ev-1",),
+        alternatives=("alt-1",),
+        constraints=("preserve-safety",),
     )
     p = tmp_path / "personalization.json"
     JsonModelStore(p).save(decision)
@@ -365,12 +398,15 @@ def test_w9_ask_cannot_become_act():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-1", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
         w9_decision_state=AutonomyDecisionState.ASK,
+        w9_decision_id="w9-dec-1",
     )
     assert decision.state == "ASK"
 
@@ -380,12 +416,15 @@ def test_w9_reject_cannot_become_act():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-1", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
         w9_decision_state=AutonomyDecisionState.REJECT,
+        w9_decision_id="w9-dec-1",
     )
     assert decision.state == "REJECT"
 
@@ -395,12 +434,18 @@ def test_w9_act_with_resolved_context_preserves_act():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-1", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
         w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-1",
+        evidence_ids=("ev-1",),
+        alternatives=("alt-1",),
+        constraints=("preserve-safety",),
     )
     assert decision.state == "ACT"
 
@@ -410,11 +455,133 @@ def test_w9_act_with_unknown_context_narrows_to_ask():
     decision = evaluate_personalization(
         policy=base_policy(),
         selector=ContextualSelector(
+            id="ctx-narrow", version=1,
             dimensions=(
                 ContextValue(dimension=ContextDimension.USER, key="id", value=TruthfulValue(TruthState.UNKNOWN, None, "no user")),
             ),
+            traceability=tr(),
         ),
         traceability=tr(),
         w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-1",
+        evidence_ids=("ev-1",),
+        alternatives=("alt-1",),
+        constraints=("preserve-safety",),
     )
     assert decision.state == "ASK"
+
+# --- SOS-W10-F02 regression: full explainability/evidence traceability ---
+
+
+def test_decision_preserves_w9_decision_id_and_evidence_refs():
+    decision = evaluate_personalization(
+        policy=base_policy(),
+        selector=ContextualSelector(
+            id="ctx-f02", version=1,
+            dimensions=(
+                ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+            ),
+            traceability=tr(),
+        ),
+        traceability=tr(),
+        w9_decision_state=AutonomyDecisionState.ACT,
+        w9_decision_id="w9-dec-f02",
+        evidence_ids=("ev-f02-1", "ev-f02-2"),
+        alternatives=("alt-a", "alt-b"),
+        constraints=("hard:safety", "soft:cost"),
+    )
+    assert decision.w9_decision_id == "w9-dec-f02"
+    assert "ev-f02-1" in decision.evidence_ids
+    assert "ev-f02-2" in decision.evidence_ids
+    assert "alt-a" in decision.alternatives
+    assert "hard:safety" in decision.constraints
+    assert decision.uncertainty.state != TruthState.SUCCESS  # uncertainty is never SUCCESS
+
+
+# --- SOS-W10-F03 regression: versioned/traceable context selector ---
+
+
+def test_contextual_selector_is_versioned_and_traceable():
+    cs = ContextualSelector(
+        id="ctx-ver-1", version=3,
+        dimensions=(
+            ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+        ),
+        traceability=tr(),
+    )
+    cs.validate()
+    assert cs.version == 3
+    assert cs.id == "ctx-ver-1"
+    assert cs.traceability.context_ref == "context:1"
+
+
+def test_contextual_selector_requires_version():
+    with pytest.raises(ModelValidationError):
+        ContextualSelector(
+            id="ctx-bad", version=0,
+            dimensions=(),
+            traceability=tr(),
+        )
+
+
+# --- SOS-W10-F04 regression: alternative selection ---
+
+
+def test_select_policy_chooses_among_alternatives():
+    selector = ContextualSelector(
+        id="ctx-sel", version=1,
+        dimensions=(
+            ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+        ),
+        traceability=tr(),
+    )
+    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=selector, priority=2)
+    alt2 = PolicyAlternative(id="alt-2", policy=base_policy(), selector=selector, priority=1)  # higher priority
+    result = select_policy(
+        alternatives=(alt1, alt2),
+        selector=selector,
+        w9_decision_state=AutonomyDecisionState.ACT,
+        traceability=tr(),
+    )
+    assert result.selected_id == "alt-2"  # priority 1 < 2
+    assert result.state == "ACT"
+    assert result.alternatives_evaluated == 2
+    assert result.selector_id == "ctx-sel"
+    assert result.selector_version == 1
+
+
+def test_select_policy_with_unresolved_context_narrows_to_ask():
+    selector = ContextualSelector(
+        id="ctx-sel-2", version=1,
+        dimensions=(
+            ContextValue(dimension=ContextDimension.USER, key="id", value=TruthfulValue(TruthState.UNKNOWN, None, "no user")),
+        ),
+        traceability=tr(),
+    )
+    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=selector, priority=1)
+    result = select_policy(
+        alternatives=(alt1,),
+        selector=selector,
+        w9_decision_state=AutonomyDecisionState.ACT,
+        traceability=tr(),
+    )
+    assert result.state == "ASK"
+    assert result.selected_id == "alt-1"
+
+
+def test_select_policy_w9_ask_preserved():
+    selector = ContextualSelector(
+        id="ctx-sel-3", version=1,
+        dimensions=(
+            ContextValue(dimension=ContextDimension.PLATFORM, key="surface", value=TruthfulValue(TruthState.SUCCESS, "web", None)),
+        ),
+        traceability=tr(),
+    )
+    alt1 = PolicyAlternative(id="alt-1", policy=base_policy(), selector=selector, priority=1)
+    result = select_policy(
+        alternatives=(alt1,),
+        selector=selector,
+        w9_decision_state=AutonomyDecisionState.ASK,
+        traceability=tr(),
+    )
+    assert result.state == "ASK"
