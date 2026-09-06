@@ -85,8 +85,9 @@ class PolicyCeiling:
 _BLAST_ORDER: dict[str, int] = {"none": 0, "limited": 1, "service": 2, "system": 3, "organization": 4}
 
 
-def _blast_rank(level: str) -> int:
-    return _BLAST_ORDER.get(level, 0)
+def _blast_rank(level: str) -> int | None:
+    """Return the blast-radius rank, or None for unknown levels (SOS-W9-F10)."""
+    return _BLAST_ORDER.get(level)
 
 
 @dataclass(frozen=True)
@@ -195,6 +196,7 @@ def evaluate_autonomy(
     assurance: "AssuranceResult | None",
     experiment: "Experiment | None",
     promotion: "PromotionDecision | None",
+    evaluation: "ExperimentEvaluation | None" = None,
     evidence_ids: tuple[str, ...],
     traceability: Traceability,
     known_evidence: dict[str, "Evidence"] | None = None,
@@ -221,6 +223,12 @@ def evaluate_autonomy(
     policy.validate()
     reasons: list[str] = []
     state = AutonomyDecisionState.ASK  # default: ask
+
+    # SOS-W9-F11: validate numeric domains for risk and confidence.
+    if not isinstance(risk, (int, float)) or not 0.0 <= risk <= 1.0:
+        raise ModelValidationError(f"risk must be a number within [0, 1], got {risk!r}")
+    if not isinstance(confidence, (int, float)) or not 0.0 <= confidence <= 1.0:
+        raise ModelValidationError(f"confidence must be a number within [0, 1], got {confidence!r}")
 
     # C1: is the action within the policy's declared allowed_actions?
     if not policy.is_action_allowed(action):
@@ -250,8 +258,22 @@ def evaluate_autonomy(
             policy_id=policy.id, traceability=traceability,
         )
 
-    # C6: blast radius exceeding ceiling -> ASK
-    if _blast_rank(blast_radius) > _blast_rank(policy.ceilings.max_blast_radius):
+    # C6: blast radius exceeding ceiling -> ASK (SOS-W9-F10: unknown values route to ASK)
+    br_rank = _blast_rank(blast_radius)
+    ceiling_rank = _blast_rank(policy.ceilings.max_blast_radius)
+    if br_rank is None or ceiling_rank is None:
+        state = AutonomyDecisionState.ASK
+        reasons.append(f"blast radius '{blast_radius}' is not a known level; ASK")
+        return AutonomyDecision(
+            id="", state=state, action=action,
+            rationale="unknown blast radius level; ASK for human scope resolution",
+            reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+            assurance_id=assurance.id if assurance else "",
+            experiment_id=experiment.id if experiment else None,
+            promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+            policy_id=policy.id, traceability=traceability,
+        )
+    if br_rank > ceiling_rank:
         state = AutonomyDecisionState.ASK
         reasons.append(f"blast radius '{blast_radius}' exceeds policy ceiling '{policy.ceilings.max_blast_radius}'")
         return AutonomyDecision(
@@ -316,8 +338,21 @@ def evaluate_autonomy(
                 promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
                 policy_id=policy.id, traceability=traceability,
             )
-        # SOS-W9-F03: rollback_path.reference must match experiment.rollback_ref.
-        if experiment is not None and experiment.rollback_ref and rollback_path.reference != experiment.rollback_ref:
+        # SOS-W9-F12: ROLLBACK requires a governed experiment context.
+        if experiment is None:
+            state = AutonomyDecisionState.ASK
+            reasons.append("ROLLBACK requires a governed experiment context; no experiment supplied")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="ROLLBACK without experiment context; ASK",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
+        # SOS-W9-F12: rollback_path.reference must match experiment.rollback_ref.
+        if experiment.rollback_ref and rollback_path.reference != experiment.rollback_ref:
             state = AutonomyDecisionState.ASK
             reasons.append(f"rollback_path.reference '{rollback_path.reference}' does not match experiment.rollback_ref '{experiment.rollback_ref}'")
             return AutonomyDecision(
@@ -409,8 +444,21 @@ def evaluate_autonomy(
             policy_id=policy.id, traceability=traceability,
         )
 
-    # For ACT: C4 — require W7 PASS assurance + W8 promotion + full chain validation
+    # For ACT: C4 — require W7 PASS assurance + W8 experiment/promotion/evaluation + full chain
     if action.value == "ACT":
+        # SOS-W9-F08: ACT requires a supplied Experiment (W8 lifecycle subordinate).
+        if experiment is None:
+            state = AutonomyDecisionState.ASK
+            reasons.append("ACT requires a governed experiment context; no experiment supplied")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="ACT without experiment context; ASK",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
         if assurance is None:
             state = AutonomyDecisionState.ASK
             reasons.append("no assurance result supplied for ACT; ASK")
@@ -462,9 +510,9 @@ def evaluate_autonomy(
                 promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
                 policy_id=policy.id, traceability=traceability,
             )
-        if experiment is not None:
-            # Validate experiment ↔ assurance chain
-            if experiment.assurance_result_id != assurance.id:
+        # experiment is guaranteed non-None (F08 check above)
+        # Validate experiment ↔ assurance chain
+        if experiment.assurance_result_id != assurance.id:
                 state = AutonomyDecisionState.REJECT
                 reasons.append(f"experiment.assurance_result_id '{experiment.assurance_result_id}' does not match assurance '{assurance.id}'")
                 return AutonomyDecision(
@@ -475,7 +523,7 @@ def evaluate_autonomy(
                     promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
                     policy_id=policy.id, traceability=traceability,
                 )
-            if experiment.candidate_id != assurance.candidate_id:
+        if experiment.candidate_id != assurance.candidate_id:
                 state = AutonomyDecisionState.REJECT
                 reasons.append("experiment.candidate_id does not match assurance.candidate_id")
                 return AutonomyDecision(
@@ -486,7 +534,7 @@ def evaluate_autonomy(
                     promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
                     policy_id=policy.id, traceability=traceability,
                 )
-            if experiment.base_graph_id != assurance.base_graph_id:
+        if experiment.base_graph_id != assurance.base_graph_id:
                 state = AutonomyDecisionState.REJECT
                 reasons.append("experiment.base_graph_id does not match assurance.base_graph_id")
                 return AutonomyDecision(
@@ -497,7 +545,7 @@ def evaluate_autonomy(
                     promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
                     policy_id=policy.id, traceability=traceability,
                 )
-            if experiment.base_graph_revision != assurance.base_graph_revision:
+        if experiment.base_graph_revision != assurance.base_graph_revision:
                 state = AutonomyDecisionState.REJECT
                 reasons.append("experiment.base_graph_revision does not match assurance.base_graph_revision")
                 return AutonomyDecision(
@@ -508,12 +556,70 @@ def evaluate_autonomy(
                     promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
                     policy_id=policy.id, traceability=traceability,
                 )
-            if experiment.provenance_revision != assurance.provenance_revision:
+        if experiment.provenance_revision != assurance.provenance_revision:
                 state = AutonomyDecisionState.REJECT
                 reasons.append("experiment.provenance_revision does not match assurance.provenance_revision")
                 return AutonomyDecision(
                     id="", state=state, action=action,
                     rationale="experiment/assurance provenance chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+
+        # SOS-W9-F09: validate the ExperimentEvaluation against the exact experiment/assurance chain.
+        if evaluation is not None:
+            if evaluation.experiment_id != experiment.id:
+                state = AutonomyDecisionState.REJECT
+                reasons.append(f"evaluation.experiment_id '{evaluation.experiment_id}' does not match experiment '{experiment.id}'")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="evaluation not bound to the exact experiment; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if evaluation.assurance_result_id != assurance.id:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("evaluation.assurance_result_id does not match assurance.id")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="evaluation/assurance chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if evaluation.candidate_id != experiment.candidate_id:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("evaluation.candidate_id does not match experiment.candidate_id")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="evaluation/experiment candidate chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if evaluation.base_graph_id != experiment.base_graph_id or evaluation.base_graph_revision != experiment.base_graph_revision:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("evaluation graph/revision does not match experiment")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="evaluation/experiment graph chain mismatch; REJECT",
+                    reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                    assurance_id=assurance.id, experiment_id=experiment.id,
+                    promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                    policy_id=policy.id, traceability=traceability,
+                )
+            if evaluation.provenance_revision != experiment.provenance_revision:
+                state = AutonomyDecisionState.REJECT
+                reasons.append("evaluation.provenance_revision does not match experiment.provenance_revision")
+                return AutonomyDecision(
+                    id="", state=state, action=action,
+                    rationale="evaluation/experiment provenance chain mismatch; REJECT",
                     reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
                     assurance_id=assurance.id, experiment_id=experiment.id,
                     promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),

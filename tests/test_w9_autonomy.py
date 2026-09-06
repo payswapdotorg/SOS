@@ -709,10 +709,22 @@ def test_fail_assurance_rejects_act():
     )
     ar = assure_candidate(candidate=c, base_graph=arch, known_evidence={e_unknown.id: e_unknown}, known_hypotheses={h.id: h})
     assert ar.status != AssuranceStatus.PASS
+    # Build a real experiment bound to this (non-PASS) assurance so the F08
+    # experiment-required gate is satisfied, reaching the assurance-status check.
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-10T00:00:00Z", "2026-09-11T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=(
+            __import__("sos").StopCondition(name="error-rate", threshold=0.05, metric="error-rate"),
+        ),
+        rollback_ref="rb-1", traceability=tr(),
+    )
     p = policy()
     e_ok = evidence(subject="node-a", value="120ms")
     result = evaluate_autonomy(
-        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=None, promotion=None,
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=None,
         evidence_ids=(e_ok.id,), traceability=tr(), known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
     )
     assert result.state == AutonomyDecisionState.REJECT
@@ -727,3 +739,111 @@ def test_policy_rejects_non_decision_action_in_allowed_actions():
                 min_confidence=0.8, require_human_approval_for_act=False),
             traceability=tr(),
         )
+
+# --- SOS-W9-F08 regression: ACT requires experiment ---
+
+
+def test_act_without_experiment_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=None, promotion=promo,
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+# --- SOS-W9-F09 regression: evaluation bound to exact experiment ---
+
+
+def test_act_with_mismatched_evaluation_rejects():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    # A forged evaluation with a DIFFERENT experiment_id.
+    from sos import ExperimentEvaluation as EvEval
+    wrong_ev = EvEval(
+        id="", experiment_id="different-experiment",
+        assurance_result_id=ar.id, candidate_id=ar.candidate_id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision,
+        evidence_ids=(), evidence_results={}, objectives=(),
+        promotion_eligible=True, stopped=False, detail="forged", traceability=tr(),
+    )
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evaluation=wrong_ev, evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.REJECT
+
+
+# --- SOS-W9-F10 regression: unknown blast radius ---
+
+
+def test_unknown_blast_radius_routes_to_ask():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=(e_ok.id,), traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
+        blast_radius="galactic",  # unknown level
+    )
+    assert result.state == AutonomyDecisionState.ASK
+
+
+# --- SOS-W9-F11 regression: invalid numeric domains ---
+
+
+def test_negative_risk_rejected():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    with pytest.raises(ModelValidationError, match="risk"):
+        evaluate_autonomy(
+            policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+            evidence_ids=(e_ok.id,), traceability=tr(),
+            known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=-0.5,
+        )
+
+
+def test_confidence_above_one_rejected():
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    with pytest.raises(ModelValidationError, match="confidence"):
+        evaluate_autonomy(
+            policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+            evidence_ids=(e_ok.id,), traceability=tr(),
+            known_evidence={e_ok.id: e_ok}, confidence=1.5, risk=0.1,
+        )
+
+
+# --- SOS-W9-F12 regression: ROLLBACK requires experiment ---
+
+
+def test_rollback_without_experiment_routes_to_ask():
+    ar = pass_assurance()
+    p_rb = AutonomyRequest(
+        id="policy-rb", version=1, allowed_actions=(DecisionAction.ROLLBACK,),
+        ceilings=PolicyCeiling(max_risk=0.3, max_blast_radius="service", require_reversible=True,
+            min_confidence=0.8, require_human_approval_for_act=False),
+        traceability=tr(),
+    )
+    rb = rollback_evidence()
+    rbp = RollbackPath(reference="rb-1", evidence_ids=(rb.id,), detail="verified")
+    result = evaluate_autonomy(
+        policy=p_rb, action=DecisionAction.ROLLBACK, assurance=ar, experiment=None, promotion=None,
+        evidence_ids=(rb.id,), traceability=tr(),
+        known_evidence={rb.id: rb}, rollback_path=rbp, confidence=0.9, risk=0.1,
+    )
+    assert result.state == AutonomyDecisionState.ASK
