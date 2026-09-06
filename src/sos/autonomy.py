@@ -224,10 +224,10 @@ def evaluate_autonomy(
     reasons: list[str] = []
     state = AutonomyDecisionState.ASK  # default: ask
 
-    # SOS-W9-F11: validate numeric domains for risk and confidence.
-    if not isinstance(risk, (int, float)) or not 0.0 <= risk <= 1.0:
+    # SOS-W9-F11/F16: validate numeric domains for risk and confidence (bool rejected explicitly).
+    if isinstance(risk, bool) or not isinstance(risk, (int, float)) or not 0.0 <= risk <= 1.0:
         raise ModelValidationError(f"risk must be a number within [0, 1], got {risk!r}")
-    if not isinstance(confidence, (int, float)) or not 0.0 <= confidence <= 1.0:
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0.0 <= confidence <= 1.0:
         raise ModelValidationError(f"confidence must be a number within [0, 1], got {confidence!r}")
 
     # C1: is the action within the policy's declared allowed_actions?
@@ -459,6 +459,45 @@ def evaluate_autonomy(
                 promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
                 policy_id=policy.id, traceability=traceability,
             )
+        # SOS-W9-F13: ACT requires an ExperimentEvaluation (not optional).
+        if evaluation is None:
+            state = AutonomyDecisionState.ASK
+            reasons.append("ACT requires an ExperimentEvaluation; no evaluation supplied")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="ACT without evaluation; ASK",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=experiment.id,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
+        # SOS-W9-F14: ACT requires the experiment to be in COMPLETED lifecycle state.
+        if experiment.state.value != "completed":
+            state = AutonomyDecisionState.REJECT
+            reasons.append(f"experiment state is {experiment.state.value}, not COMPLETED; ACT requires lifecycle completion")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale=f"experiment not COMPLETED ({experiment.state.value}); REJECT",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=experiment.id,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
+        # SOS-W9-F13: validate promotion.evaluation_id == evaluation.id.
+        if promotion is not None and promotion.evaluation_id != evaluation.id:
+            state = AutonomyDecisionState.REJECT
+            reasons.append(f"promotion.evaluation_id '{promotion.evaluation_id}' does not match evaluation.id '{evaluation.id}'")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="promotion not bound to the exact evaluation; REJECT",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=experiment.id,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
         if assurance is None:
             state = AutonomyDecisionState.ASK
             reasons.append("no assurance result supplied for ACT; ASK")
@@ -633,6 +672,19 @@ def evaluate_autonomy(
             return AutonomyDecision(
                 id="", state=state, action=action,
                 rationale="no evidence supplied; GATHER_EVIDENCE",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id,
+                experiment_id=experiment.id if experiment else None,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id),
+                policy_id=policy.id, traceability=traceability,
+            )
+        # SOS-W9-F15: ACT evidence_ids must match the evaluation's evidence_ids exactly.
+        if set(evidence_ids) != set(evaluation.evidence_ids):
+            state = AutonomyDecisionState.REJECT
+            reasons.append("ACT evidence_ids do not match evaluation.evidence_ids")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="evidence set mismatch with W8 evaluation; REJECT",
                 reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
                 assurance_id=assurance.id,
                 experiment_id=experiment.id if experiment else None,
