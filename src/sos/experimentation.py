@@ -292,13 +292,23 @@ class ExperimentEvaluation:
     """A truthful, bounded evaluation of an experiment's observed evidence.
 
     ``promotion_eligible`` is True only when: (a) evaluation_success was supplied,
-    (b) no hard stop fired, (c) all referenced evidence is SUCCESS, and (d)
-    rollback or a documented containment exception is present. Promotion is an
-    explicit gate decision, not implicit (C6).
+    (b) no hard stop fired, (c) all referenced evidence is SUCCESS AND provenance-
+    bound to the experiment's revision (F05), (d) rollback or a documented
+    containment exception is present AND bound to the experiment's rollback_ref
+    (F06), and (e) the evidence set is non-empty (F07). Promotion is an explicit
+    gate decision, not implicit (C6).
+
+    SOS-W8-F08: the evaluation carries the exact assurance/candidate/graph/
+    provenance chain so PromotionGate can validate the full binding.
     """
 
     id: str
     experiment_id: str
+    assurance_result_id: str
+    candidate_id: str
+    base_graph_id: str
+    base_graph_revision: str
+    provenance_revision: str
     evidence_ids: tuple[str, ...]
     evidence_results: dict[str, TruthState]
     objectives: tuple[Any, ...]
@@ -315,12 +325,24 @@ class ExperimentEvaluation:
     def validate(self) -> None:
         if not self.experiment_id.strip():
             raise ModelValidationError("ExperimentEvaluation.experiment_id is required")
+        if not self.assurance_result_id.strip():
+            raise ModelValidationError("ExperimentEvaluation.assurance_result_id is required")
+        if not self.candidate_id.strip():
+            raise ModelValidationError("ExperimentEvaluation.candidate_id is required")
+        if not self.base_graph_id.strip():
+            raise ModelValidationError("ExperimentEvaluation.base_graph_id is required")
+        if not self.base_graph_revision.strip():
+            raise ModelValidationError("ExperimentEvaluation.base_graph_revision is required")
+        if not self.provenance_revision.strip():
+            raise ModelValidationError("ExperimentEvaluation.provenance_revision is required")
         self.traceability.validate(require_value=True, require_context=True)
 
 
 def _evaluation_id(ev: ExperimentEvaluation) -> str:
     material = "|".join([
-        ev.experiment_id, ",".join(ev.evidence_ids),
+        ev.experiment_id, ev.assurance_result_id, ev.candidate_id,
+        ev.base_graph_id, ev.base_graph_revision, ev.provenance_revision,
+        ",".join(ev.evidence_ids),
         str(ev.promotion_eligible), str(ev.stopped),
     ])
     digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
@@ -339,22 +361,21 @@ def evaluate_experiment(
 ) -> ExperimentEvaluation:
     """Evaluate an experiment's observed evidence truthfully (C4, C5, C9).
 
-    - C4 (SOS-W8-F04): only the explicitly declared ``evidence_refs`` participate
-      in promotion gating; each is validated against ``known_evidence``; unrelated
-      evidence does not affect eligibility. Truth states are preserved; UNKNOWN/
-      FAILED/UNAVAILABLE evidence cannot produce promotion eligibility.
-    - C5: a fired stop condition stops the experiment and cannot be offset by
-      favorable objectives.
-    - C7 (SOS-W8-F02): promotion eligibility requires a validated governed
-      ``RollbackPath`` (its evidence ids resolve + are SUCCESS) or a documented
-      containment exception — not an arbitrary non-empty ``rollback_ref`` string.
+    - C4 (SOS-W8-F04): only declared ``evidence_refs`` participate; unrelated
+      evidence is ignored.
+    - C4 (SOS-W8-F05): each evidence record's provenance/implementation_revision
+      is validated against the experiment's ``provenance_revision``; a SUCCESS
+      record from a different revision is rejected.
+    - C5: a fired stop condition cannot be offset by objectives.
+    - C7 (SOS-W8-F02/F06): recovery requires a governed ``RollbackPath`` whose
+      ``reference`` matches ``experiment.rollback_ref`` and whose evidence
+      provenance/revision matches the experiment's binding; or a documented
+      containment exception.
+    - C4/C6 (SOS-W8-F07): zero observation evidence cannot produce promotion
+      eligibility.
     - C9: objectives are preserved (no scalar).
     """
     experiment.validate()
-    # SOS-W8-F04: explicit evidence reference set. If evidence_refs is empty,
-    # no evidence participates (all_success stays True vacuously, but
-    # promotion_eligible also requires evaluation_success which the caller must
-    # supply). Unrelated evidence in known_evidence is ignored.
     if evidence_refs is None:
         evidence_refs = ()
     evidence_ids: list[str] = []
@@ -363,7 +384,6 @@ def evaluate_experiment(
     for eid in evidence_refs:
         ev = known_evidence.get(eid)
         if ev is None:
-            # Unknown referenced evidence id — cannot produce PASS (C4).
             evidence_ids.append(eid)
             evidence_results[eid] = TruthState.UNKNOWN
             all_success = False
@@ -373,36 +393,56 @@ def evaluate_experiment(
         evidence_results[eid] = state
         if state != TruthState.SUCCESS:
             all_success = False
+        # SOS-W8-F05: validate evidence provenance/revision against the experiment.
+        ev_rev = getattr(getattr(ev, "provenance", None), "implementation_revision", None)
+        if ev_rev is not None and ev_rev != experiment.provenance_revision:
+            all_success = False
+            evidence_results[eid] = TruthState.UNKNOWN  # provenance mismatch → not trustworthy
+
+    # SOS-W8-F07: zero observation evidence cannot produce promotion eligibility.
+    has_evidence = len(evidence_ids) > 0
 
     # C5: hard stop conditions fire — cannot be offset by objectives.
     stopped = len(stop_trigger) > 0
 
-    # SOS-W8-F02: recovery must be backed by a validated governed RollbackPath
-    # (its evidence ids resolve to known SUCCESS records) or a documented
-    # containment exception. An arbitrary non-empty rollback_ref string is NOT
-    # sufficient.
+    # SOS-W8-F02/F06: recovery must be backed by a governed RollbackPath whose
+    # reference matches experiment.rollback_ref AND whose evidence provenance
+    # matches the experiment's binding, or a documented containment exception.
     recovery_satisfied = False
     if rollback_path is not None:
-        # Validate the rollback path against known evidence.
-        try:
-            rollback_path.validate(known_evidence=known_evidence)
-        except ModelValidationError:
+        # F06: the rollback path's reference must match the experiment's declared rollback_ref.
+        if experiment.rollback_ref and rollback_path.reference != experiment.rollback_ref:
             recovery_satisfied = False
         else:
-            # All rollback evidence must be SUCCESS.
-            recovery_satisfied = all(
-                known_evidence.get(eid) is not None
-                and getattr(known_evidence[eid], "result", None) is not None
-                and known_evidence[eid].result.state == TruthState.SUCCESS
-                for eid in rollback_path.evidence_ids
-            )
-    if not recovery_satisfied and experiment.containment_policy_ref is not None and experiment.containment_policy_ref.strip() != "":
-        recovery_satisfied = True  # documented containment exception
+            try:
+                rollback_path.validate(known_evidence=known_evidence)
+            except ModelValidationError:
+                recovery_satisfied = False
+            else:
+                # All rollback evidence must be SUCCESS AND provenance-bound.
+                recovery_satisfied = True
+                for eid in rollback_path.evidence_ids:
+                    ev = known_evidence.get(eid)
+                    if ev is None or not hasattr(ev, "result") or ev.result.state != TruthState.SUCCESS:
+                        recovery_satisfied = False
+                        break
+                    # F06: rollback evidence provenance must match the experiment's revision.
+                    ev_rev = getattr(getattr(ev, "provenance", None), "implementation_revision", None)
+                    if ev_rev is not None and ev_rev != experiment.provenance_revision:
+                        recovery_satisfied = False
+                        break
+    if not recovery_satisfied and experiment.containment_policy_ref is not None:
+        # Containment guard: validate the containment_policy_ref is governed
+        # (must start with "governed-" prefix to distinguish from arbitrary strings).
+        cpr = experiment.containment_policy_ref.strip()
+        if cpr.startswith("governed-"):
+            recovery_satisfied = True
 
-    # C4 + C6: promotion eligibility requires: evaluation_success + all evidence
-    # SUCCESS + no hard stop + recovery satisfied.
+    # C4 + C6 + F07: promotion eligibility requires: evaluation_success + non-empty
+    # evidence + all evidence SUCCESS + no hard stop + recovery satisfied.
     promotion_eligible = (
         evaluation_success
+        and has_evidence
         and all_success
         and not stopped
         and recovery_satisfied
@@ -411,22 +451,29 @@ def evaluate_experiment(
     detail_parts: list[str] = []
     if stopped:
         detail_parts.append(f"hard stop fired: {', '.join(stop_trigger)}")
+    if not has_evidence:
+        detail_parts.append("no observation evidence declared")
     if not all_success:
-        detail_parts.append("non-SUCCESS evidence present")
+        detail_parts.append("non-SUCCESS or provenance-mismatched evidence present")
     if not recovery_satisfied:
         detail_parts.append("no validated rollback path or documented containment exception")
-    if evaluation_success and all_success and not stopped and recovery_satisfied:
+    if evaluation_success and has_evidence and all_success and not stopped and recovery_satisfied:
         detail_parts.append("promotion eligible")
-    elif evaluation_success and all_success and not stopped and not recovery_satisfied:
+    elif evaluation_success and has_evidence and all_success and not stopped and not recovery_satisfied:
         detail_parts.append("evaluation succeeded but recovery not satisfied")
     detail = "; ".join(detail_parts) if detail_parts else "evaluation complete"
 
     return ExperimentEvaluation(
         id="",
         experiment_id=experiment.id,
+        assurance_result_id=experiment.assurance_result_id,
+        candidate_id=experiment.candidate_id,
+        base_graph_id=experiment.base_graph_id,
+        base_graph_revision=experiment.base_graph_revision,
+        provenance_revision=experiment.provenance_revision,
         evidence_ids=tuple(evidence_ids),
         evidence_results=evidence_results,
-        objectives=known_assurance.objectives if known_assurance is not None else (),  # C9: preserve W6 objectives
+        objectives=known_assurance.objectives if known_assurance is not None else (),
         promotion_eligible=promotion_eligible,
         stopped=stopped,
         detail=detail,
@@ -471,11 +518,42 @@ class PromotionGate:
         known_assurance: "AssuranceResult",
     ) -> PromotionDecision:
         experiment.validate(known_assurance=known_assurance)
-        # SOS-W8-F03: the evaluation must be bound to the exact experiment under
-        # review. A promotion decision cannot consume an unrelated evaluation.
+        # SOS-W8-F03: the evaluation must be bound to the exact experiment.
         if evaluation.experiment_id != experiment.id:
             raise ModelValidationError(
                 f"PromotionGate: evaluation.experiment_id '{evaluation.experiment_id}' does not match experiment '{experiment.id}'"
+            )
+        # SOS-W8-F08: the evaluation must be bound to the exact assurance/candidate/
+        # graph/provenance chain — not just experiment_id. A forged evaluation with
+        # a matching id but a different chain must be rejected.
+        if evaluation.assurance_result_id != experiment.assurance_result_id:
+            raise ModelValidationError(
+                f"PromotionGate: evaluation.assurance_result_id '{evaluation.assurance_result_id}' does not match experiment's '{experiment.assurance_result_id}'"
+            )
+        if evaluation.candidate_id != experiment.candidate_id:
+            raise ModelValidationError(
+                f"PromotionGate: evaluation.candidate_id '{evaluation.candidate_id}' does not match experiment's '{experiment.candidate_id}'"
+            )
+        if evaluation.base_graph_id != experiment.base_graph_id:
+            raise ModelValidationError(
+                f"PromotionGate: evaluation.base_graph_id '{evaluation.base_graph_id}' does not match experiment's '{experiment.base_graph_id}'"
+            )
+        if evaluation.base_graph_revision != experiment.base_graph_revision:
+            raise ModelValidationError(
+                f"PromotionGate: evaluation.base_graph_revision '{evaluation.base_graph_revision}' does not match experiment's '{experiment.base_graph_revision}'"
+            )
+        if evaluation.provenance_revision != experiment.provenance_revision:
+            raise ModelValidationError(
+                f"PromotionGate: evaluation.provenance_revision '{evaluation.provenance_revision}' does not match experiment's '{experiment.provenance_revision}'"
+            )
+        # SOS-W8-F09: promotion requires the experiment to be in a promotion-ready
+        # lifecycle state (COMPLETED). A PLANNED/READY/RUNNING experiment cannot
+        # be promoted.
+        if experiment.state != ExperimentState.COMPLETED:
+            return PromotionDecision(
+                promoted=False,
+                rationale=f"experiment state is {experiment.state.value}, not COMPLETED; promotion requires lifecycle completion",
+                experiment_id=experiment.id, evaluation_id=evaluation.id,
             )
         # C2: assurance must be PASS.
         if known_assurance.status.value != "PASS":
@@ -493,6 +571,6 @@ class PromotionGate:
             )
         return PromotionDecision(
             promoted=True,
-            rationale="assurance PASS + promotion-eligible evaluation + recovery satisfied",
+            rationale="assurance PASS + COMPLETED + promotion-eligible evaluation + recovery satisfied + full chain binding validated",
             experiment_id=experiment.id, evaluation_id=evaluation.id,
         )

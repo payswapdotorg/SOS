@@ -689,11 +689,14 @@ def test_promotion_gate_rejects_evaluation_not_bound_to_experiment():
         success_criteria=("latency<200",), stop_conditions=stop_conditions(),
         rollback_ref="rb-1", traceability=tr(),
     )
-    # An evaluation bound to a DIFFERENT experiment id.
+    # An evaluation bound to a DIFFERENT experiment id (but same chain fields).
     ev = ExperimentEvaluation(
-        id="", experiment_id="different-experiment-id", evidence_ids=(),
-        evidence_results={}, objectives=(), promotion_eligible=True, stopped=False,
-        detail="unrelated evaluation", traceability=tr(),
+        id="", experiment_id="different-experiment-id",
+        assurance_result_id=ar.id, candidate_id=ar.candidate_id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision,
+        evidence_ids=(), evidence_results={}, objectives=(), promotion_eligible=True,
+        stopped=False, detail="unrelated evaluation", traceability=tr(),
     )
     gate = PromotionGate()
     with pytest.raises(ModelValidationError, match="does not match experiment"):
@@ -753,6 +756,206 @@ def test_unknown_referenced_evidence_id_blocks_promotion():
     assert ev.promotion_eligible is False
 
 
+# --- SOS-W8-F05 regression: evidence provenance/revision binding ---
+
+
+def test_evidence_with_mismatched_provenance_revision_blocks_promotion():
+    """SOS-W8-F05: a SUCCESS evidence record whose provenance/implementation_revision
+    does not match the experiment's provenance_revision cannot produce promotion
+    eligibility."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="rb-1", traceability=tr(),
+    )
+    # Evidence with a MISMATCHED implementation_revision.
+    from sos import EvidenceProvenance
+    e_wrong_rev = StaticEvidenceAdapter.from_static_observation(
+        subject_ref="node-a", observation="latency=120ms",
+        result=TruthfulValue(TruthState.SUCCESS, "120ms", None),
+        traceability=tr(),
+        provenance=EvidenceProvenance(
+            source="test", observed_subject="node-a",
+            timestamp="2026-09-09T12:00:00Z", environment="production",
+            implementation_revision="WRONG-REVISION",  # mismatch
+        ),
+    )
+    rb = rollback_evidence()
+    known = {e_wrong_rev.id: e_wrong_rev, rb.id: rb}
+    rbp = RollbackPath(reference="rb-1", evidence_ids=(rb.id,), detail="verified rollback path")
+    ev = evaluate_experiment(
+        exp, known_evidence=known, evidence_refs=(e_wrong_rev.id,),
+        evaluation_success=True, rollback_path=rbp,
+    )
+    assert ev.promotion_eligible is False
+
+
+# --- SOS-W8-F06 regression: rollback path bound to experiment's rollback_ref ---
+
+
+def test_rollback_path_with_mismatched_reference_blocks_promotion():
+    """SOS-W8-F06: a RollbackPath whose reference does not match
+    experiment.rollback_ref cannot satisfy recovery."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="rb-1", traceability=tr(),
+    )
+    e_ok = evidence(subject="node-a", value="120ms")
+    rb = rollback_evidence()
+    known = {e_ok.id: e_ok, rb.id: rb}
+    # The RollbackPath reference does NOT match experiment.rollback_ref ("rb-1").
+    rbp = RollbackPath(reference="wrong-ref", evidence_ids=(rb.id,), detail="verified rollback path")
+    ev = evaluate_experiment(
+        exp, known_evidence=known, evidence_refs=(e_ok.id,),
+        evaluation_success=True, rollback_path=rbp,
+    )
+    assert ev.promotion_eligible is False
+
+
+# --- SOS-W8-F07 regression: empty evidence cannot yield promotion ---
+
+
+def test_empty_evidence_refs_cannot_produce_promotion_eligibility():
+    """SOS-W8-F07: zero observation evidence cannot produce promotion eligibility,
+    even with evaluation_success=True and a valid rollback path."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="rb-1", traceability=tr(),
+    )
+    rb = rollback_evidence()
+    known = {rb.id: rb}
+    rbp = RollbackPath(reference="rb-1", evidence_ids=(rb.id,), detail="verified rollback path")
+    ev = evaluate_experiment(
+        exp, known_evidence=known, evidence_refs=(),  # empty evidence
+        evaluation_success=True, rollback_path=rbp,
+    )
+    assert ev.promotion_eligible is False
+
+
+# --- SOS-W8-F08 regression: full chain binding in PromotionGate ---
+
+
+def test_promotion_gate_rejects_evaluation_with_mismatched_chain():
+    """SOS-W8-F08: PromotionGate must reject an evaluation whose assurance/candidate/
+    graph/provenance chain does not match the experiment's, even if experiment_id
+    matches."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="rb-1", traceability=tr(),
+        state=ExperimentState.COMPLETED,  # F09: promotion-ready
+    )
+    # A forged evaluation with matching experiment_id but WRONG candidate_id.
+    ev = ExperimentEvaluation(
+        id="", experiment_id=exp.id,
+        assurance_result_id=ar.id, candidate_id="wrong-candidate",  # mismatch
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision,
+        evidence_ids=(), evidence_results={}, objectives=(), promotion_eligible=True,
+        stopped=False, detail="forged", traceability=tr(),
+    )
+    gate = PromotionGate()
+    with pytest.raises(ModelValidationError, match="candidate_id"):
+        gate.evaluate(exp, ev, known_assurance=ar)
+
+
+# --- SOS-W8-F09 regression: promotion requires lifecycle completion ---
+
+
+def test_promotion_rejects_non_completed_experiment():
+    """SOS-W8-F09: PromotionGate must reject an experiment that is not in
+    COMPLETED state, even with a promotion-eligible evaluation."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="rb-1", traceability=tr(),
+        state=ExperimentState.RUNNING,  # not COMPLETED
+    )
+    e_ok = evidence(subject="node-a", value="120ms")
+    rb = rollback_evidence()
+    known = {e_ok.id: e_ok, rb.id: rb}
+    rbp = RollbackPath(reference="rb-1", evidence_ids=(rb.id,), detail="verified rollback path")
+    ev = evaluate_experiment(
+        exp, known_evidence=known, evidence_refs=(e_ok.id,),
+        evaluation_success=True, rollback_path=rbp, known_assurance=ar,
+    )
+    gate = PromotionGate()
+    decision = gate.evaluate(exp, ev, known_assurance=ar)
+    assert decision.promoted is False
+    assert "not COMPLETED" in decision.rationale
+
+
+def test_promotion_accepts_completed_experiment():
+    """SOS-W8-F09 positive: a COMPLETED experiment with a promotion-eligible
+    evaluation can be promoted."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.CANARY,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="rb-1", traceability=tr(),
+        state=ExperimentState.COMPLETED,
+    )
+    e_ok = evidence(subject="node-a", value="120ms")
+    rb = rollback_evidence()
+    known = {e_ok.id: e_ok, rb.id: rb}
+    rbp = RollbackPath(reference="rb-1", evidence_ids=(rb.id,), detail="verified rollback path")
+    ev = evaluate_experiment(
+        exp, known_evidence=known, evidence_refs=(e_ok.id,),
+        evaluation_success=True, rollback_path=rbp, known_assurance=ar,
+    )
+    assert ev.promotion_eligible is True
+    gate = PromotionGate()
+    decision = gate.evaluate(exp, ev, known_assurance=ar)
+    assert decision.promoted is True
+
+
+# --- Containment guard: governed prefix required ---
+
+
+def test_arbitrary_containment_policy_ref_does_not_satisfy_recovery():
+    """Containment guard: an arbitrary non-empty containment_policy_ref that does
+    NOT start with 'governed-' is not accepted as a governed containment exception."""
+    ar = pass_assurance()
+    exp = Experiment(
+        id="", candidate_id=ar.candidate_id, assurance_result_id=ar.id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision, mode=ExperimentMode.SHADOW,
+        scope=("node-a",), observation_window=("2026-09-09T00:00:00Z", "2026-09-10T00:00:00Z"),
+        success_criteria=("latency<200",), stop_conditions=stop_conditions(),
+        rollback_ref="",  # no rollback
+        containment_policy_ref="arbitrary-string",  # not governed-
+        traceability=tr(),
+    )
+    e_ok = evidence(subject="node-a", value="120ms")
+    ev = evaluate_experiment(
+        exp, known_evidence={e_ok.id: e_ok}, evidence_refs=(e_ok.id,), evaluation_success=True,
+    )
+    assert ev.promotion_eligible is False  # arbitrary string is not governed
 
 
 def test_experiment_preserves_objectives_without_scalar_authority():
