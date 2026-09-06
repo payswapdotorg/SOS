@@ -977,3 +977,32 @@ def test_bool_confidence_rejected():
             known_evidence={e_ok.id: e_ok}, confidence=False, risk=0.1,
             evaluation=ev,
         )
+
+# --- SOS-W9-F17 regression: evaluation must be promotion_eligible ---
+
+
+def test_act_rejects_non_eligible_evaluation():
+    """SOS-W9-F17: ACT must reject an evaluation with promotion_eligible=False,
+    even with a promoted PromotionDecision and matching IDs."""
+    ar = pass_assurance()
+    exp, ev, promo = completed_experiment_with_promotion(ar)
+    p = policy()
+    e_ok = evidence(subject="node-a", value="120ms")
+    # Forge a matching evaluation with promotion_eligible=False
+    from sos import ExperimentEvaluation as EvEval
+    non_eligible_ev = EvEval(
+        id=ev.id, experiment_id=exp.id,
+        assurance_result_id=ar.id, candidate_id=ar.candidate_id,
+        base_graph_id=ar.base_graph_id, base_graph_revision=ar.base_graph_revision,
+        provenance_revision=ar.provenance_revision,
+        evidence_ids=ev.evidence_ids, evidence_results=ev.evidence_results,
+        objectives=ev.objectives, promotion_eligible=False,  # NOT eligible
+        stopped=False, detail="not eligible", traceability=tr(),
+    )
+    result = evaluate_autonomy(
+        policy=p, action=DecisionAction.ACT, assurance=ar, experiment=exp, promotion=promo,
+        evidence_ids=ev.evidence_ids, traceability=tr(),
+        known_evidence={e_ok.id: e_ok}, confidence=0.9, risk=0.1,
+        evaluation=non_eligible_ev,
+    )
+    assert result.state == AutonomyDecisionState.REJECT

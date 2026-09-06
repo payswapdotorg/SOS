@@ -130,8 +130,8 @@ Exact-head results:
 
 ```text
 $ python -m pytest
-222 passed in 0.56s
-  tests/test_w9_autonomy.py ...........................................  (43)
+223 passed in 0.56s
+  tests/test_w9_autonomy.py ............................................  (44)
 $ python -m compileall -q src tests
 (clean, no syntax errors)
 ```

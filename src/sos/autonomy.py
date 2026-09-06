@@ -498,6 +498,19 @@ def evaluate_autonomy(
                 promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
                 policy_id=policy.id, traceability=traceability,
             )
+        # SOS-W9-F17: ACT requires the W8 evaluation to be promotion_eligible.
+        if not evaluation.promotion_eligible:
+            state = AutonomyDecisionState.REJECT
+            reasons.append("evaluation.promotion_eligible is False; ACT requires a promotion-eligible evaluation")
+            return AutonomyDecision(
+                id="", state=state, action=action,
+                rationale="evaluation not promotion-eligible; REJECT",
+                reasons=tuple(reasons), evidence_ids=tuple(evidence_ids),
+                assurance_id=assurance.id if assurance else "",
+                experiment_id=experiment.id,
+                promotion_id=(promotion.experiment_id + ":" + promotion.evaluation_id) if promotion else None,
+                policy_id=policy.id, traceability=traceability,
+            )
         if assurance is None:
             state = AutonomyDecisionState.ASK
             reasons.append("no assurance result supplied for ACT; ASK")
