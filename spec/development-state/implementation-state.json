@@ -1,1 +1,34 @@
-{"schemaVersion":"1.0","program":"SOS-v1","roadmap":"spec/implementation-roadmap.md","status":"W9_DISPATCHED","tasks":{"W0":{"status":"BOOTSTRAP_COMPLETE","dependencies":[],"mergedAs":null,"bootstrapCommit":"8158bc441025e6e815999deb965dd4b7adf989ac"},"W1":{"status":"COMPLETE","dependencies":["W0"],"mergedAs":"091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},"W2":{"status":"COMPLETE","dependencies":["W1"],"mergedAs":"587201d3e12a10ba9fac6da751d663a40c33dfb9"},"W3":{"status":"COMPLETE","dependencies":["W2"],"mergedAs":"6541441bb706ef1f27b2c38b9eb930433641b14b"},"W4":{"status":"COMPLETE","dependencies":["W2"],"mergedAs":"26060db57c24ba8b36315c1005466046810c5163"},"W5":{"status":"COMPLETE","dependencies":["W4"],"mergedAs":"2bfd0f89da129c6b3347d88b0d8da1b79dd04127"},"W6":{"status":"COMPLETE","dependencies":["W3","W5"],"mergedAs":"b5171f70ca5ce85ca0be07cfdb3abf034c03c32f"},"W7":{"status":"COMPLETE","dependencies":["W6"],"mergedAs":"25f663cf444f92b3190074a9119619cbc53e9ece"},"W8":{"status":"COMPLETE","dependencies":["W7"],"mergedAs":"65b84058aa204b3749e45b7e21ae433a4b138d83"},"W9":{"status":"DISPATCHED","dependencies":["W7","W8"],"mergedAs":null},"W10":{"status":"BLOCKED","dependencies":["W2","W9"],"mergedAs":null},"W11":{"status":"BLOCKED","dependencies":["W1","W2","W9"],"mergedAs":null},"W12":{"status":"BLOCKED","dependencies":["W3","W4","W5","W6","W7","W8","W9"],"mergedAs":null},"W13":{"status":"BLOCKED","dependencies":["W8","W9"],"mergedAs":null},"W14":{"status":"BLOCKED","dependencies":["W10","W11","W12","W13"],"mergedAs":null},"W15":{"status":"BLOCKED","dependencies":["W14"],"mergedAs":null}},"currentFrontier":["W9"],"currentTask":"W9","notes":["W8 is authoritatively merged as 65b84058aa204b3749e45b7e21ae433a4b138d83 after exact-head Architect review at worker head 209a42937d2040558e400ada12a214e36fe95744 and successful exact-head CI run #157.","W9 is dispatched only after authoritative W8 merge verification; W9 Work Order is spec/work-orders/W9-autonomy-ask.md.","All later status must be reconciled from actual Git merge evidence.","Never treat this file's projections as stronger than Git history or frozen architecture."]}
+{
+  "schemaVersion": "1.0",
+  "program": "SOS-v1",
+  "roadmap": "spec/implementation-roadmap.md",
+  "status": "W10_DISPATCHED",
+  "tasks": {
+    "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
+    "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
+    "W2": {"status": "COMPLETE", "dependencies": ["W1"], "mergedAs": "587201d3e12a10ba9fac6da751d663a40c33dfb9"},
+    "W3": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "6541441bb706ef1f27b2c38b9eb930433641b14b"},
+    "W4": {"status": "COMPLETE", "dependencies": ["W2"], "mergedAs": "26060db57c24ba8b36315c1005466046810c5163"},
+    "W5": {"status": "COMPLETE", "dependencies": ["W4"], "mergedAs": "2bfd0f89da129c6b3347d88b0d8da1b79dd04127"},
+    "W6": {"status": "COMPLETE", "dependencies": ["W3", "W5"], "mergedAs": "b5171f70ca5ce85ca0be07cfdb3abf034c03c32f"},
+    "W7": {"status": "COMPLETE", "dependencies": ["W6"], "mergedAs": "25f663cf444f92b3190074a9119619cbc53e9ece"},
+    "W8": {"status": "COMPLETE", "dependencies": ["W7"], "mergedAs": "65b84058aa204b3749e45b7e21ae433a4b138d83"},
+    "W9": {"status": "COMPLETE", "dependencies": ["W7", "W8"], "mergedAs": "203cfb7590bd25244cabf3cc7299dd192b00948d"},
+    "W10": {"status": "DISPATCHED", "dependencies": ["W2", "W9"], "mergedAs": null},
+    "W11": {"status": "BLOCKED", "dependencies": ["W1", "W2", "W9"], "mergedAs": null},
+    "W12": {"status": "BLOCKED", "dependencies": ["W3", "W4", "W5", "W6", "W7", "W8", "W9"], "mergedAs": null},
+    "W13": {"status": "BLOCKED", "dependencies": ["W8", "W9"], "mergedAs": null},
+    "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
+    "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
+  },
+  "currentFrontier": ["W10"],
+  "currentTask": "W10",
+  "notes": [
+    "W8 is authoritatively merged as 65b84058aa204b3749e45b7e21ae433a4b138d83 after exact-head Architect review and successful exact-head CI run #157.",
+    "W9 is authoritatively merged as 203cfb7590bd25244cabf3cc7299dd192b00948d from exact reviewed Worker head e85b4168837820761c74c8084215296e4ae192de; exact-head CI run #171 succeeded.",
+    "W10 is dispatched by spec/work-orders/W10-personalization-platform.md after authoritative W2 and W9 merge verification.",
+    "W10 is limited to contextual personalization and platform-neutral adapter contracts; W11/W12/W13 remain blocked.",
+    "All later status must be reconciled from actual Git merge evidence.",
+    "Never treat this file's projections as stronger than Git history or frozen architecture."
+  ]
+}
