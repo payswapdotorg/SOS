@@ -6,11 +6,12 @@
 
 ## Current repository facts
 
-- Main SHA at dispatch: `22d00cc9e59650c573a8b487061a0ab2356d1628` (state-reconciliation commit)
+- Main was advanced by the setup commits `22d00cc9`, `586a0766`, `6e0789e8`, `9dcd96aa`, and `bb369f4d`; workers MUST re-read live `main` before using a base SHA.
 - W9 merge: `203cfb7590bd25244cabf3cc7299dd192b00948d`
 - Active W10 PR: #17
 - W10 branch: `work/w10-personalization-platform`
 - Latest known W10 head at dispatch setup: `b5ccc5f3e9b9af247b78df00bde1b1554a73f8f9`
+- **Stale-base condition:** PR #17 still targets the pre-setup W10 base `d2b813eb32085fdc5e12180da5f2f141b13036e7`; Worker A MUST refresh/rebase/update the branch against live `main` before the next Architect review. No merge is authorized on the stale base.
 
 ## Worker A — W10 closure
 
