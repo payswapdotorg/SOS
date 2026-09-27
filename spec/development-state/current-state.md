@@ -1,32 +1,53 @@
 # SOS Current State
 
-**Status:** Informational projection of `implementation-state.json` and live Git facts.
+**Status:** Informational projection reconciled to live Git as of 2026-09-27.
 
 ## Program
 
-SOS-v1 W0 governance foundation, W1 mission/value/context, W2 System State + architecture graph, W3 architecture recovery, W4 evidence/observability boundary, and W5 causal knowledge + architecture memory are authoritatively merged.
+SOS-v1 W0 governance foundation through W9 autonomy/ASK/human authority are authoritatively merged. W10 contextual personalization + platform adapters is the active implementation frontier.
 
 ## Repository State
 
 - Architecture Version: `1.0` frozen
 - Roadmap Version: `1.0` frozen
-- Last Completed Work Order: `W5`
-- W5 Merge SHA: `2bfd0f89da129c6b3347d88b0d8da1b79dd04127`
-- Active Work Order: `W6 — Candidate Generation + Bounded Search`
-- Next Eligible Work Order: `W6 — Candidate Generation + Bounded Search`
-
-## Current frontier
-
-`W6 — Candidate Generation + Bounded Search`
+- Last Completed Work Order: `W9`
+- W9 Merge SHA: `203cfb7590bd25244cabf3cc7299dd192b00948d`
+- Live `main` SHA: `d2b813eb32085fdc5e12180da5f2f141b13036e7`
+- Active Work Order: `W10 — Contextual Personalization + Platform Adapters`
+- Active PR: `#17`
+- Active PR branch: `work/w10-personalization-platform`
+- Current reviewed implementation head: `b5ccc5f3e9b9af247b78df00bde1b1554a73f8f9`
+- Current frontier: `W10`
 
 ## Dependency proof
 
-`W6` is eligible because W3 is authoritatively merged as `6541441bb706ef1f27b2c38b9eb930433641b14b` and W5 is authoritatively merged as `2bfd0f89da129c6b3347d88b0d8da1b79dd04127`. No unmerged sibling is treated as a dependency.
+W10 is eligible because W2 is authoritatively merged as `587201d3e12a10ba9fac6da751d663a40c33dfb9` and W9 is authoritatively merged as `203cfb7590bd25244cabf3cc7299dd192b00948d`.
+
+W11/W12/W13 remain roadmap-blocked until the frozen sequencing gates are satisfied. Preparation work may proceed only as explicitly bounded, artifact-only spikes that do not treat unmerged sibling work as a dependency.
+
+## Active review findings
+
+PR #17 has passed deterministic CI on prior exact heads and remains merge-blocked pending Architect review of the latest head.
+
+The next W10 review must verify at minimum:
+
+1. Context-conditioned alternative selection compares alternative predicates to the actual supplied context rather than merely checking SUCCESS truth states.
+2. `FAILED` context truth states cannot silently preserve `ACT`; uncertainty/failure handling must route through an explicit non-authorizing outcome consistent with W9.
+3. Contextual policy selection remains a strict narrowing of W9 authority.
+4. Platform constraints are explicit narrowing constraints, not merely capability metadata.
+5. PR/checkpoint/design metadata is reconciled to the exact live head before approval.
+
+## Parallel preparation lanes
+
+Two bounded preparation lanes are authorized alongside W10:
+
+- `PREP-W11`: design/test contract for the provider-neutral execution substrate. No production execution code and no W11 completion claim.
+- `PREP-provider-cockpit`: research/design contract for OpenMuse as an execution provider and Code-OSS as an experience/client surface. No semantic authority migration and no dependency on unmerged W10.
 
 ## Recovery path
 
-`live main → implementation roadmap → implementation-state.json → W6 Work Order → implementation → exact verification/evidence → Architect review`
+`live main → implementation roadmap → implementation-state.json → selected Work Order / preparation artifact → implementation or research → exact verification/evidence → Architect review`
 
 ## Important
 
-This file is not an authorization source. Recompute state from Git and the canonical machine artifact before acting. Completion is grounded in actual merge SHA; this projection is reconciled after the merge.
+This file is not an authorization source. Recompute status from actual Git and canonical machine state before implementation or merge. Completion requires Architect approval, actual Git merge, and canonical reconciliation.
