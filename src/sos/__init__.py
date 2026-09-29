@@ -118,6 +118,26 @@ from .execution import (
     receipt_to_w4_evidence,
     validate_lifecycle_transition,
 )
+from .optimization import (
+    AuthorizationResolution,
+    ExperimentSimulatorPort,
+    IterationOutcome,
+    LoopIteration,
+    LoopPromotion,
+    LoopStop,
+    LoopStopReason,
+    OptimizationContractError,
+    OptimizationLoop,
+    OptimizationRun,
+    PendingAuthorization,
+    PromotionClass,
+    SimulatedObservation,
+    apply_promotion,
+    dispatch_deployment,
+    governed_experiment,
+    run_optimization_loop,
+    validate_iteration_transition,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
