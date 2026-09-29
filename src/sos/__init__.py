@@ -102,6 +102,22 @@ from .platform import (
     constrain_policy,
     validate_adapter,
 )
+from .execution import (
+    ExecutionActionScope,
+    ExecutionContractError,
+    ExecutionLifecycleState,
+    ExecutionProviderPort,
+    ExecutionReceipt,
+    ExecutionRequest,
+    ExecutionSubstrate,
+    ProviderCapability,
+    ProviderUnavailableSignal,
+    RollbackReference,
+    SideEffect,
+    SideEffectKind,
+    receipt_to_w4_evidence,
+    validate_lifecycle_transition,
+)
 from .model import (
     AskPayload,
     AutonomyPolicy,
