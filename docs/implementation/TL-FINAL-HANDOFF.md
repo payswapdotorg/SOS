@@ -1,6 +1,6 @@
 # SOS — Final LLM Tech Lead Handoff
 
-**Date:** 2026-09-27
+**Date:** 2026-09-29 (TL takeover reconciliation)
 **Role:** LLM Tech Lead / Product Architect handoff
 **Authority:** Repository + actual Git facts
 
@@ -14,92 +14,46 @@ The frozen semantic loop is:
 
 LLMs are proposal/reasoning mechanisms. They are never a fifth authority class.
 
+Non-negotiable invariants (full set lives in the frozen constitution/architecture; operator-restated): Constitution authoritative; mission/value/context explicit; System State canonical; evidence never stronger than observed; FAILED ≠ UNKNOWN ≠ UNAVAILABLE ≠ UNSUPPORTED; W7 assures, W8 experiments/promotes/rolls back, W9 authorizes; ASK never becomes ACT implicitly; platform context narrows but never widens; providers execute, SOS authorizes; clients display, SOS defines semantics; LLM output is proposal material, not authority; self-evolution is itself governed; all consequential changes bounded and reversible; no unmerged sibling is an authoritative dependency; exact source revisions traceable; fresh agents recover entirely from the repository.
+
 ## 2. Authoritative implementation frontier
 
-W0 through W9 are authoritatively merged.
+W0 through W11 are authoritatively merged:
 
-- W9 merge: `203cfb7590bd25244cabf3cc7299dd192b00948d`
-- Live main must be re-read before every new branch/base decision.
-- W10 is the current roadmap frontier.
-- W10 PR: #17
-- W10 branch: `work/w10-personalization-platform`
-- Latest setup artifact chain ended at `2e20902183492c9f00a92eba92129d97879b6eb9`.
+- W10 merge: `a1778653c35064eeb9d71563f17b30fb174d9429` (PR #17)
+- W11 merge: `aae251813d31f5b85e005d4bff94462a84c440df` (PR #18)
+- W12 dispatch/reconciliation point: `e3a97b895ca7f6cc7206a50bde45b2b55c554195`
 
-The repository machine state remains W10-dispatched. Preparation spikes below are intentionally not recorded as roadmap completion.
+Governance caveat (recorded, binding): W10 and W11 were accepted via **operator-delegated TL self-approval** rather than independent Architect review. Git state is authoritative; governance confidence is weaker than intended. Do NOT rewrite history or reopen W10/W11 unless later integration evidence exposes an actual semantic defect. For W12/W13/W14/W15, strict independent Architect gates are restored — the TL verifies but never self-approves.
 
-## 3. Current W10 reality
+Live `main` must be re-read before every new branch/base decision.
 
-The W10 implementation exists on PR #17 and has passed deterministic CI on recent exact heads, but it is not merged.
+## 3. Current W12 reality
 
-The PR originally targeted base `d2b813eb32085fdc5e12180da5f2f141b13036e7`. The Architect setup commits have advanced main, so the PR is now stale-base.
+- W12 PR: `#19`, branch `work/w12-optimization-loop`, base `e3a97b895ca7f6cc7206a50bde45b2b55c554195`, exact head `fd6d20f875ff3d52ceec6c3100548be57be34e61` (implementation `cba274710ba3c76a883edbf4a91f836b57279e83` + docs/checkpoint commit).
+- State: `WAITING_FOR_ARCHITECT` (checkpoint review iteration 1). Open, mergeable, CI green on the exact head, **zero submitted reviews** — the Architect gate has NOT been given. No merge is authorized.
+- TL independent verification (2026-09-29): `python -m pytest` → **360 passed**; `python -m compileall -q src tests` → clean; C1–C10 review complete, no semantic defects; two non-blocking notes recorded in `spec/development-state/current-state.md` (lifecycle-vs-truth axis on FAILED mapping; deterministic id-ordering vs future value-ranking).
+- The W12 implementation composes the real W3/W4/W5/W6/W7/W8/W9(/W11) authorities; it introduces no new authority class (architecture §12).
 
-**Worker A must refresh/rebase/update the W10 branch against live main before another Architect review.**
-
-The next review must verify:
-
-1. Alternative selectors are true predicates against actual context values, not merely SUCCESS flags.
-2. FAILED context truth states cannot silently preserve ACT.
-3. W9 ASK/REJECT and all policy ceilings remain authoritative.
-4. Platform constraints explicitly narrow an already-authorized policy.
-5. All W10 checkpoint/design/PR evidence records the exact corrected head.
-6. Exact-head CI is green.
+The Architect review of PR #19 must address (at minimum): genuine gating by pre-existing authorities at every consequential step; MODEL_ONLY promotion stays internal model state; rollback evidence distinguishes modeled lifecycle transition from actual external recovery; truth-state distinctions preserved end-to-end; exact non-forgeable cross-authority references; deterministic ordering acceptable for the current W6 candidate model; the optional W11 seam incapable of becoming an authority. Do not expand W12 because additional functionality is imaginable.
 
 ## 4. Three-worker operating model
 
-### Worker A — W10 closure
+Current cycle (state and missions): see `spec/development-state/WORKER-DISPATCH.md` (authoritative). Summary:
 
-Owns the existing W10 PR only.
+- **Worker A — W12 closure:** fresh review at the exact head, verify C1–C10, run the gates, fix any semantic defect on the SAME PR #19, stop at `WAITING_FOR_ARCHITECT` with an exact-head checkpoint. No merge, no second implementation.
+- **Worker B — W13 preparation:** DELIVERED (package committed by this reconciliation). Standing mission: review the prepared package for contract drift; no W13 implementation before the W12 merge.
+- **Worker C — W14 + W15 preparation:** DELIVERED (packages committed by this reconciliation). No implementation.
 
-Goal:
+No-sibling-dependency rule: B/C artifacts are based on current `main`, frozen architecture, roadmap, and authoritative merged work — never on Worker A's unmerged branch.
 
-`W10 correction → exact verification → WAITING_FOR_ARCHITECT`
+Post-merge rotations (operator directive, binding):
 
-No new PR and no merge by the worker.
+- After W12 merges: A → W13 implementation; B → W13 verification/adversarial review support; C → W14 implementation preparation. TL reconciles machine state + operational docs, records the W12 merge SHA, moves frontier to W13.
+- After W13 merges: A → W14 integration implementation; B → W14 adversarial verification; C → W15 final-gate preparation.
+- After W14 merges (W15 final gate): A → integration/reproduction verification; B → adversarial evidence audit; C → documentation/reconciliation audit; TL → final integration; Architect → final gate. No new architecture during W15.
 
-Primary artifact:
-
-`spec/work-orders/W10-personalization-platform.md`
-
-Coordination:
-
-`spec/development-state/WORKER-DISPATCH.md`
-
-### Worker B — W11 execution-substrate preparation
-
-Artifact-only preparation for the next realization gate.
-
-Primary artifact:
-
-`spec/work-orders/PREP-W11-execution-substrate.md`
-
-Define a provider-neutral contract of the form:
-
-`ExecutionRequest → ExecutionProvider → ExecutionReceipt → Evidence`
-
-Required properties:
-
-- W9 authority cannot be bypassed.
-- Provider capability is separate from authorization.
-- Exact source revision/environment/time provenance is preserved.
-- Failure/unknown/unavailable/unsupported outcomes stay distinct.
-- Rollback/recovery is governed.
-- Multiple providers can implement the same contract.
-
-No live execution yet.
-
-### Worker C — OpenMuse + Code-OSS preparation
-
-Primary artifact:
-
-`spec/work-orders/PREP-provider-cockpit.md`
-
-OpenMuse is being evaluated as a replaceable execution provider for browser, terminal, workspace, computer and durable-task execution.
-
-Code-OSS is being evaluated as a replaceable engineering cockpit/client surface for mission, system state, evidence, candidates, assurance, experiments, ASK and worker sessions.
-
-Neither is allowed to become an SOS authority.
-
-## 5. Target architecture after preparation
+## 5. Target architecture
 
 ```
                     ┌─────────────────────┐
@@ -117,7 +71,8 @@ Neither is allowed to become an SOS authority.
              │                                   │
       ┌──────┼────────┐                 ┌────────┴───────┐
       │      │        │                 │                │
-   OpenMuse GitHub   VM/CI          Code-OSS        Web/Mobile
+   provider   GitHub   VM/CI          client cockpit   Web/Mobile
+   (W11 port)
 ```
 
 The central architectural rule is:
@@ -128,15 +83,11 @@ The central architectural rule is:
 
 ## 6. Sequencing rule
 
-Do not silently turn the preparation spikes into W11/W12/W13 completion.
-
 The frozen program remains:
 
-`W10 → W11 → W12 → W13 → W14 → W15`
+`W12 → W13 → W14 → W15 → ROADMAP COMPLETE`
 
-Preparation is allowed in parallel because it does not claim or depend on unmerged implementation.
-
-When W10 is merged, the TL should convert the strongest preparation artifact into the next bounded implementation Work Order and dispatch against a freshly verified main SHA.
+W13/W14/W15 specification packages exist (this reconciliation) but are DISPATCH-BLOCKED until their frozen dependencies carry authoritative merge SHAs. Preparation never claims or depends on unmerged implementation. At dispatch time, re-verify dependency merges from actual Git history and record the exact base SHA.
 
 ## 7. Review discipline
 
@@ -152,15 +103,18 @@ Never:
 - let a provider authorize itself;
 - let context widen W9 authority;
 - treat missing/failed data as success;
-- merge a stale base.
+- merge a stale base;
+- merge without the independent Architect gate (W12+).
+
+Completion standard (binding): implementation → exact-head verification → checkpoint → Architect review → approved → actual Git merge → canonical reconciliation → next frontier. Code + tests + PR + green CI are necessary, never sufficient.
 
 ## 8. Immediate TL priorities
 
-1. Get Worker A to refresh PR #17 against live main and close the W10 findings.
-2. Have Worker B produce the provider-neutral execution contract and contract tests.
-3. Have Worker C produce the OpenMuse adapter + Code-OSS cockpit integration design.
-4. Review B/C artifacts together for duplicated semantics and authority leakage.
-5. After W10 merges, authorize the smallest W11 implementation slice using the prepared contract.
+1. Close W12 correctly: Worker A's independent review (or equivalent fresh verification) → Architect approval → merge → canonical reconciliation (record W12 merge SHA, frontier → W13).
+2. Keep the prepared W13 package reconciled; at W12 merge, convert it into the dispatched bounded W13 Work Order with a freshly verified base SHA.
+3. Dispatch per the rotation table (§4); enforce the no-sibling-dependency rule.
+4. Re-run every gate personally at every exact head; never trust reported numbers.
+5. After each merge, reconcile `implementation-state.json`, `current-state.md`, `WORKER-DISPATCH.md`, and this handoff.
 
 ## 9. Success condition for this handoff
 
@@ -168,12 +122,12 @@ A fresh TL should be able to recover the complete operating state from:
 
 - `ARCHITECT_START_HERE.md`
 - `AGENTS.md`
-- frozen architecture/requirements/roadmap
+- frozen architecture/requirements/roadmap/constitution
 - `spec/development-state/implementation-state.json`
+- `spec/development-state/current-state.md`
 - `spec/development-state/WORKER-DISPATCH.md`
-- `docs/implementation/TL-3-WORKER-COORDINATION.md`
-- the active W10 PR
-- `PREP-W11-execution-substrate.md`
-- `PREP-provider-cockpit.md`
+- `spec/work-orders/W12-optimization-loop.md` + the W12 checkpoint/design at the exact PR #19 head
+- the prepared W13/W14/W15 packages
+- the active PR #19
 
-without requiring conversation history.
+without requiring conversation history. Recovery order: live main SHA → roadmap → implementation-state.json → PR #19 → W12 Work Order → checkpoint + design at exact head → frozen architecture/requirements/constitution → operational docs → close W12 → dispatch W13 → W14 → W15.

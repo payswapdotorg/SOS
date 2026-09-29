@@ -4,85 +4,78 @@
 **Dispatch authority:** Architect/TL coordination artifact
 **Repository source of truth:** Git + canonical development state
 
-## Current repository facts
+## Current repository facts (2026-09-29 TL takeover reconciliation)
 
-- Main was advanced by the setup commits `22d00cc9`, `586a0766`, `6e0789e8`, `9dcd96aa`, and `bb369f4d`; workers MUST re-read live `main` before using a base SHA.
-- W9 merge: `203cfb7590bd25244cabf3cc7299dd192b00948d`
-- Active W10 PR: #17
-- W10 branch: `work/w10-personalization-platform`
-- Latest known W10 head at dispatch setup: `b5ccc5f3e9b9af247b78df00bde1b1554a73f8f9`
-- **Stale-base condition:** PR #17 still targets the pre-setup W10 base `d2b813eb32085fdc5e12180da5f2f141b13036e7`; Worker A MUST refresh/rebase/update the branch against live `main` before the next Architect review. No merge is authorized on the stale base.
+- Live `main` at the W12 dispatch point: `e3a97b895ca7f6cc7206a50bde45b2b55c554195` (this reconciliation commit advances `main` beyond it; re-read live `main` before any branch/base decision).
+- W10 merge: `a1778653c35064eeb9d71563f17b30fb174d9429` (PR #17). W11 merge: `aae251813d31f5b85e005d4bff94462a84c440df` (PR #18). Both are Git-authoritative; both carry the recorded governance caveat of operator-delegated TL self-approval (see `current-state.md`).
+- Active W12 PR: `#19` on branch `work/w12-optimization-loop`, exact head `fd6d20f875ff3d52ceec6c3100548be57be34e61` (implementation `cba274710ba3c76a883edbf4a91f836b57279e83` + docs/checkpoint `fd6d20f`), base `e3a97b8`, mergeable, CI green on the exact head.
+- TL independent verification at the exact head: **360 passed**, `compileall` clean, C1–C10 review complete — no semantic defects found (two non-blocking notes recorded in `current-state.md`).
+- PR #19 state: `WAITING_FOR_ARCHITECT` (checkpoint review iteration 1). **No Architect review has been submitted; no merge is authorized.**
+- Machine state: `spec/development-state/implementation-state.json` → `W12_DISPATCHED`, frontier `W12`.
 
-## Worker A — W10 closure
+## Current-cycle worker allocation
 
-**Branch/PR:** existing `work/w10-personalization-platform` / PR #17
+### Worker A — W12 closure
 
-### Mission
+**Branch/PR:** existing `work/w12-optimization-loop` / PR #19
 
-Resolve the Architect review boundary on the same PR and return a corrected exact head to `WAITING_FOR_ARCHITECT`.
+Mission: perform a fresh independent review of the W12 implementation at the exact head (`src/sos/optimization.py`, `tests/test_w12_optimization_loop.py`, `docs/implementation/W12-OPTIMIZATION-LOOP-DESIGN.md`, `spec/development-state/W12-checkpoint.md`), verify every W12 C1–C10 criterion, run `python -m pytest` and `python -m compileall -q src tests`, fix any discovered semantic defect **on the same PR #19** (no second implementation, no new PR), and stop at `WAITING_FOR_ARCHITECT` with an exact-head checkpoint.
 
-### Mandatory next checks
+Forbidden: merging the PR; creating a second W12 implementation; expanding W12 scope beyond the five allowed files; touching frozen authority artifacts.
 
-- Compare alternative predicates to actual context values.
-- Do not treat SUCCESS truth state as a context match by itself.
-- Ensure FAILED context never becomes implicit ACT.
-- Preserve W9 ASK/REJECT and all authority ceilings.
-- Model platform constraints as explicit narrowing constraints.
-- Reconcile W10 checkpoint/design/PR metadata with the exact head.
+Note: the TL has already performed an independent verification (above). Worker A's review is the additional independent layer for the restored strict Architect-gate discipline; if both reviews find no defect, the PR proceeds straight to the Architect.
 
-### Required verification
+### Worker B — W13 preparation (DELIVERED)
+
+The W13 specification package is **committed by this reconciliation** (was assigned to Worker B; prepared by the TL's delegated preparation pass):
+
+- `spec/work-orders/W13-self-evolution.md`
+- `docs/implementation/W13-SELF-EVOLUTION-DESIGN.md`
+- `spec/development-state/W13-checkpoint.md` (preparation template only)
+
+Status: PREPARED — DISPATCH BLOCKED (W12 not merged). Worker B's standing mission until W12 merges: review the prepared package for contract drift against the frozen architecture and report findings; do NOT begin W13 implementation.
+
+### Worker C — W14 + W15 preparation (DELIVERED)
+
+The W14 and W15 specification packages are **committed by this reconciliation**:
+
+- `spec/work-orders/W14-dogfood-adversarial-verification.md`
+- `docs/implementation/W14-DOGFOOD-ADVERSARIAL-DESIGN.md`
+- `spec/work-orders/W15-final-architect-gate.md`
+- `docs/implementation/W15-FINAL-GATE-DESIGN.md`
+
+Status: PREPARED — DISPATCH BLOCKED. Worker C's standing mission until W12/W13 merge: keep the packages reconciled to actual Git state; no implementation.
+
+## No-sibling-dependency rule (binding)
+
+Workers B and C artifacts are based on current `main`, the frozen architecture, the roadmap, and already-authoritative merged work — never on Worker A's unmerged branch. An unmerged sibling is never a dependency.
+
+## Post-merge rotation (operator directive, binding)
+
+- **After W12 merges:** Worker A → W13 implementation; Worker B → W13 verification / adversarial review support (independently builds the review/test matrix; never depends on A's unmerged branch); Worker C → W14 implementation preparation. TL reconciles `implementation-state.json`, `current-state.md`, this file, records the W12 merge SHA, moves frontier to W13.
+- **After W13 merges:** Worker A → W14 integration implementation; Worker B → W14 adversarial verification; Worker C → W15 final-gate preparation.
+- **After W14 merges (W15 final gate):** Worker A → integration/reproduction verification; Worker B → adversarial evidence audit; Worker C → documentation/reconciliation audit; TL → final integration; Architect → final gate. No new architecture is invented during W15.
+
+## Required verification (every worker, exact head)
 
 `python -m pytest`
 `python -m compileall -q src tests`
 
-No merge by the worker.
-
-## Worker B — W11 preparation
-
-**Artifact:** `spec/work-orders/PREP-W11-execution-substrate.md`
-
-### Mission
-
-Define the provider-neutral execution contract and deterministic contract tests so implementation can start cleanly when the W11 gate opens.
-
-### Forbidden
-
-No live execution; no provider-specific semantics in SOS core; no W11 completion claim.
-
-## Worker C — OpenMuse + Code-OSS preparation
-
-**Artifact:** `spec/work-orders/PREP-provider-cockpit.md`
-
-### Mission
-
-Turn the OpenMuse and Code-OSS findings into concrete replaceable adapter/client seams and a smallest-first W11 implementation plan.
-
-### Forbidden
-
-No forks imported into SOS; no authority migration; no live execution; no roadmap completion claim.
+No merge by any worker. No network/provider dependency in the deterministic suite.
 
 ## TL responsibilities
 
-The Tech Lead must:
+1. Keep Worker A focused on the existing W12 PR; corrections stay on PR #19.
+2. Prevent B/C from turning preparation into unauthorized W13/W14/W15 implementation before the gates open.
+3. Independently verify every review-ready head (re-run the gates; never trust reported numbers).
+4. Reconcile canonical state from actual Git facts after every merge; record merge SHAs.
+5. Merge only after the independent Architect gate passes (operator approval for W12+; TL self-approval is no longer acceptable).
+6. Convert preparation artifacts into bounded implementation Work Orders at dispatch time rather than creating informal dependencies.
 
-1. Keep Worker A focused on the existing W10 PR.
-2. Prevent B/C from turning preparation into unauthorized W11 implementation.
-3. Review B/C artifacts for duplication and contract drift.
-4. Keep provider execution below SOS authorization and assurance.
-5. Merge only after Architect review gates pass.
-6. After W10 merge, convert the best preparation artifact into the next bounded implementation Work Order rather than creating an informal dependency.
-7. Reconcile canonical state from actual Git facts after every merge.
+## Completion standard (binding)
 
-## Concurrency model
-
-`A: W10 implementation`
-+
-`B: W11 execution design`
-+
-`C: OpenMuse/Code-OSS integration design`
-
-No sibling branch is an authoritative dependency until merged.
+A Work Order is complete only through: implementation → exact-head verification → checkpoint → independent Architect review → approved → actual Git merge → canonical reconciliation → next frontier. Code existing, tests passing, PR open, and CI green are necessary but never sufficient.
 
 ## Handoff state
 
-A fresh TL should read this file, `TL-3-WORKER-COORDINATION.md`, the two preparation Work Orders, the active W10 PR, and the frozen architecture/roadmap before dispatching or changing work.
+A fresh TL should read, in order: live `main` SHA → `spec/implementation-roadmap.md` → `spec/development-state/implementation-state.json` → PR #19 → `spec/work-orders/W12-optimization-loop.md` → the W12 checkpoint + design at the exact head → frozen architecture/requirements/constitution → `docs/implementation/TL-FINAL-HANDOFF.md` → this file. Conversation history is not required.
