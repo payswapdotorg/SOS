@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "program": "SOS-v1",
   "roadmap": "spec/implementation-roadmap.md",
-  "status": "W10_DISPATCHED",
+  "status": "W11_DISPATCHED",
   "tasks": {
     "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
@@ -14,20 +14,22 @@
     "W7": {"status": "COMPLETE", "dependencies": ["W6"], "mergedAs": "25f663cf444f92b3190074a9119619cbc53e9ece"},
     "W8": {"status": "COMPLETE", "dependencies": ["W7"], "mergedAs": "65b84058aa204b3749e45b7e21ae433a4b138d83"},
     "W9": {"status": "COMPLETE", "dependencies": ["W7", "W8"], "mergedAs": "203cfb7590bd25244cabf3cc7299dd192b00948d"},
-    "W10": {"status": "DISPATCHED", "dependencies": ["W2", "W9"], "mergedAs": null},
-    "W11": {"status": "BLOCKED", "dependencies": ["W1", "W2", "W9"], "mergedAs": null},
+    "W10": {"status": "COMPLETE", "dependencies": ["W2", "W9"], "mergedAs": "a1778653c35064eeb9d71563f17b30fb174d9429"},
+    "W11": {"status": "DISPATCHED", "dependencies": ["W1", "W2", "W9"], "mergedAs": null},
     "W12": {"status": "BLOCKED", "dependencies": ["W3", "W4", "W5", "W6", "W7", "W8", "W9"], "mergedAs": null},
     "W13": {"status": "BLOCKED", "dependencies": ["W8", "W9"], "mergedAs": null},
     "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
     "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
   },
-  "currentFrontier": ["W10"],
-  "currentTask": "W10",
+  "currentFrontier": ["W11"],
+  "currentTask": "W11",
   "notes": [
     "W8 is authoritatively merged as 65b84058aa204b3749e45b7e21ae433a4b138d83 after exact-head Architect review and successful exact-head CI run #157.",
     "W9 is authoritatively merged as 203cfb7590bd25244cabf3cc7299dd192b00948d from exact reviewed Worker head e85b4168837820761c74c8084215296e4ae192de; exact-head CI run #171 succeeded.",
     "W10 is dispatched by spec/work-orders/W10-personalization-platform.md after authoritative W2 and W9 merge verification.",
-    "W10 is limited to contextual personalization and platform-neutral adapter contracts; W11/W12/W13 remain blocked.",
+    "W10 is authoritatively merged as a1778653c35064eeb9d71563f17b30fb174d9429 (merge of PR #17, exact reviewed head c28f01e51c58ede8737e11931152f31d38dee552, exact-head CI green) after operator-delegated TL self-approval of the W10 gate packet (evidence: W10-GATE-SELF-APPROVAL, replay evidence dir).",
+    "W11 is dispatched by spec/work-orders/W11-execution-substrate.md against live post-merge main a1778653c35064eeb9d71563f17b30fb174d9429; it is the first bounded slice of greenfield realization (provider-neutral execution substrate per the PREP-W11 verified contract).",
+    "W12/W13 remain blocked until their frozen dependencies merge.",
     "All later status must be reconciled from actual Git merge evidence.",
     "Never treat this file's projections as stronger than Git history or frozen architecture."
   ]
