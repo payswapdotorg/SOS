@@ -3,15 +3,26 @@
 Defines a common adapter boundary for web, mobile, desktop, TV, cross-platform
 and future supported surfaces. Adapters are contract/policy interfaces only —
 no deployment, network, or side effects (C5, C6).
+
+Architect review iteration 4 correction (finding A5): platform constraints are
+modeled as an explicit, typed, construction-validated narrowing constraint
+record (``PlatformPolicyConstraint``): a platform adapter may further restrict
+``allowed_actions`` / ceilings of an already-authorized policy — like
+``ContextualPolicy`` narrows W9 — but never widen. Widening and invalid
+constraint data are rejected deterministically (C12); all validation is pure
+and side-effect-free (C6).
 """
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
-from .model import ModelValidationError, Traceability
+from .model import ModelValidationError, Traceability, DecisionAction
+
+if TYPE_CHECKING:
+    from .autonomy import AutonomyRequest, PolicyCeiling
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +158,10 @@ def validate_adapter(
 ) -> AdapterPlan:
     """Validate an adapter against required capabilities (C6, C9).
 
-    Pure function: no side effects, no network, no deployment.
+    Pure function: no side effects, no network, no deployment. Capability-set
+    validation only — the explicit narrowing of an already-authorized policy
+    against platform constraints is modeled separately by
+    ``PlatformPolicyConstraint`` / ``constrain_policy`` (A5, C7).
     Returns an ``AdapterPlan`` with ``compatible`` indicating whether all
     required capabilities are supported.
     """
@@ -165,4 +179,119 @@ def validate_adapter(
         required_capabilities=tuple(required_capabilities),
         missing_capabilities=tuple(missing),
         traceability=adapter.traceability,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Platform policy narrowing constraints (A5, C7)
+# ---------------------------------------------------------------------------
+
+
+_BLAST_ORDER: dict[str, int] = {"none": 0, "limited": 1, "service": 2, "system": 3, "organization": 4}
+
+
+def _blast_rank(level: str) -> int:
+    return _BLAST_ORDER.get(level, 0)
+
+
+@dataclass(frozen=True)
+class PlatformPolicyConstraint:
+    """A typed platform narrowing constraint over an already-authorized W9 policy (A5, C7).
+
+    Platform/adapter constraints may further restrict an authorized policy —
+    like ``ContextualPolicy`` narrows W9 — but never widen it:
+
+    - ``narrowed_allowed_actions`` must be a non-empty subset of the authorized
+      ``source_policy.allowed_actions`` (real W1 ``DecisionAction`` members);
+    - ``narrowed_ceilings`` must be stricter than or equal to the authorized
+      ``source_policy.ceilings``: risk ceiling no higher, blast radius no
+      wider, reversibility not relaxed, confidence floor no lower, human
+      approval for ACT never waived.
+
+    Construction-validated: widening or invalid constraint data raises
+    ``ModelValidationError`` deterministically (C12). Pure data + validation
+    only — no execution, network, or external side effects (C6).
+    """
+
+    id: str
+    version: int
+    adapter_id: str
+    source_policy: "AutonomyRequest"
+    narrowed_allowed_actions: tuple[Any, ...]
+    narrowed_ceilings: "PolicyCeiling"
+    traceability: Traceability
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if not self.id.strip():
+            raise ModelValidationError("PlatformPolicyConstraint.id is required")
+        if self.version < 1:
+            raise ModelValidationError("PlatformPolicyConstraint.version must be >= 1")
+        if not self.adapter_id.strip():
+            raise ModelValidationError("PlatformPolicyConstraint.adapter_id is required")
+        if not self.narrowed_allowed_actions:
+            raise ModelValidationError("PlatformPolicyConstraint.narrowed_allowed_actions is required")
+        # C12: every narrowed action must be a real W1 DecisionAction member.
+        for a in self.narrowed_allowed_actions:
+            if not isinstance(a, DecisionAction):
+                raise ModelValidationError(
+                    f"PlatformPolicyConstraint.narrowed_allowed_actions contains a non-DecisionAction value: {a!r}"
+                )
+        self.source_policy.validate()
+        source_set = set(self.source_policy.allowed_actions)
+        for a in self.narrowed_allowed_actions:
+            if a not in source_set:
+                raise ModelValidationError(
+                    f"PlatformPolicyConstraint cannot expand allowed_actions: {a} not in source policy"
+                )
+        sc = self.source_policy.ceilings
+        nc = self.narrowed_ceilings
+        if nc.max_risk > sc.max_risk:
+            raise ModelValidationError(
+                f"PlatformPolicyConstraint cannot relax max_risk: {nc.max_risk} > {sc.max_risk}"
+            )
+        if _blast_rank(nc.max_blast_radius) > _blast_rank(sc.max_blast_radius):
+            raise ModelValidationError(
+                f"PlatformPolicyConstraint cannot widen max_blast_radius: {nc.max_blast_radius} > {sc.max_blast_radius}"
+            )
+        if sc.require_reversible and not nc.require_reversible:
+            raise ModelValidationError("PlatformPolicyConstraint cannot relax require_reversible")
+        if nc.min_confidence < sc.min_confidence:
+            raise ModelValidationError(
+                f"PlatformPolicyConstraint cannot lower min_confidence: {nc.min_confidence} < {sc.min_confidence}"
+            )
+        if sc.require_human_approval_for_act and not nc.require_human_approval_for_act:
+            raise ModelValidationError("PlatformPolicyConstraint cannot waive human approval")
+        self.traceability.validate(require_value=True, require_context=True)
+
+
+def constrain_policy(
+    adapter: PlatformAdapter,
+    *,
+    source_policy: "AutonomyRequest",
+    narrowed_allowed_actions: tuple[Any, ...],
+    narrowed_ceilings: "PolicyCeiling",
+    constraint_id: str,
+    version: int = 1,
+    traceability: Traceability | None = None,
+) -> PlatformPolicyConstraint:
+    """Build the platform narrowing constraint for ``adapter`` over an authorized policy (A5, C7).
+
+    Pure, deterministic, side-effect-free (C6): validates the adapter, then
+    returns the construction-validated ``PlatformPolicyConstraint``. Widening
+    or invalid constraint data raises ``ModelValidationError`` (C12). The
+    adapter's capabilities/metadata remain non-authoritative — only the
+    narrowing constraint may restrict, never grant, authority (C7).
+    """
+    adapter.validate()
+    return PlatformPolicyConstraint(
+        id=constraint_id,
+        version=version,
+        adapter_id=adapter.id,
+        source_policy=source_policy,
+        narrowed_allowed_actions=tuple(narrowed_allowed_actions),
+        narrowed_ceilings=narrowed_ceilings,
+        traceability=traceability if traceability is not None else adapter.traceability,
     )

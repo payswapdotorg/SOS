@@ -3,12 +3,30 @@
 Represents explicit context dimensions relevant to policy selection, selects
 bounded policies/candidates against context while preserving global constraints,
 and preserves W9 authority (context may narrow but never widen).
+
+Architect review iteration 4 corrections (findings A1–A4):
+
+- A1: alternative selection is a TRUE predicate over the SUPPLIED context —
+  for every dimension an alternative declares, the supplied selector must
+  contain a corresponding resolvable value equal to the alternative's declared
+  constraint; a SUCCESS flag on the alternative's own declaration alone never
+  implies compatibility;
+- A2: every non-SUCCESS supplied truth state (FAILED and EMPTY included)
+  narrows the decision — no non-SUCCESS state is collapsed into success, so a
+  FAILED context can never silently preserve ACT;
+- A3: all state adjustment is monotonic in the W9 decision-state lattice
+  (``narrow_decision_state``): inherited REJECT/ROLLBACK survive, ACT may
+  narrow to ASK, and nothing ever moves to a less restrictive state;
+- A4: selection results carry per-alternative evaluation evidence, the
+  inherited W9 state, and the narrowing chain (inherited → final, with
+  reasons), JSON-round-trippable and strictly additive to the existing
+  dataclass contract.
 """
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import Any, Mapping, TYPE_CHECKING
 
 from .model import ModelValidationError, Traceability, TruthState, TruthfulValue, ContextDimension, ContextValue, DecisionAction
 from .autonomy import AutonomyDecisionState
@@ -169,13 +187,70 @@ def _decision_id(d: PersonalizationDecision) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Policy alternative selection (F04)
+# Monotonic narrowing in the W9 decision-state lattice (A3, C3)
+# ---------------------------------------------------------------------------
+
+
+# Restriction ranks over the W9 ``AutonomyDecisionState`` lattice, derived from
+# the frozen W9 transition contract (``src/sos/autonomy.py``, SOS-W9-F19):
+# ACT is the only authorizing state (least restrictive); EXPERIMENT and
+# GATHER_EVIDENCE are non-authorizing forward-lifecycle states; ASK gates on
+# human authority; REJECT and ROLLBACK are terminal non-authorization (most
+# restrictive). W10 narrowing may only move to a state at least as restrictive
+# as the inherited W9 state — it may never widen authority (C3).
+_RESTRICTION_RANK: dict[AutonomyDecisionState, int] = {
+    AutonomyDecisionState.ACT: 0,
+    AutonomyDecisionState.EXPERIMENT: 1,
+    AutonomyDecisionState.GATHER_EVIDENCE: 1,
+    AutonomyDecisionState.ASK: 2,
+    AutonomyDecisionState.REJECT: 3,
+    AutonomyDecisionState.ROLLBACK: 3,
+}
+
+
+def narrow_decision_state(
+    inherited: AutonomyDecisionState,
+    candidate: AutonomyDecisionState,
+) -> AutonomyDecisionState:
+    """Monotonic narrowing in the W9 decision-state lattice (A3, C3).
+
+    Returns ``candidate`` only when it is strictly MORE restrictive than
+    ``inherited``; otherwise returns ``inherited``. Consequently:
+
+    - inherited ``REJECT`` stays ``REJECT`` (an ASK candidate is less
+      restrictive and is refused);
+    - inherited ``ROLLBACK`` stays ``ROLLBACK``;
+    - ``ACT`` may narrow to ``ASK``;
+    - nothing ever moves to a LESS restrictive state than inherited, so W10
+      can never upgrade W9 authority (C3).
+    """
+    if not isinstance(inherited, AutonomyDecisionState):
+        raise ModelValidationError(
+            f"inherited state must be an AutonomyDecisionState, got {inherited!r}"
+        )
+    if not isinstance(candidate, AutonomyDecisionState):
+        raise ModelValidationError(
+            f"candidate state must be an AutonomyDecisionState, got {candidate!r}"
+        )
+    if _RESTRICTION_RANK[candidate] > _RESTRICTION_RANK[inherited]:
+        return candidate
+    return inherited
+
+
+# ---------------------------------------------------------------------------
+# Alternative selection as a predicate over the SUPPLIED context (A1, F04)
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class PolicyAlternative:
-    """A declared policy/candidate alternative for context-conditioned selection (F04)."""
+    """A declared policy/candidate alternative for context-conditioned selection (F04).
+
+    ``selector`` declares the alternative's context constraints: for every
+    declared dimension the SUPPLIED selector must carry a corresponding
+    resolvable (SUCCESS) value equal to the declared value for the alternative
+    to be context-compatible (A1).
+    """
 
     id: str
     policy: "AutonomyRequest"
@@ -191,9 +266,105 @@ class PolicyAlternative:
         self.selector.validate()
 
 
+# Per-dimension supplied-context outcomes for one declared alternative (A4).
+_OUTCOME_MATCHED = "matched"
+_OUTCOME_MISMATCHED = "mismatched"
+_OUTCOME_UNRESOLVED = "unresolved"
+# Recorded as the supplied truth state when the declared dimension is entirely
+# absent from the supplied selector (A1: absent dimensions are unresolved).
+_SUPPLIED_ABSENT = "ABSENT"
+
+
+@dataclass(frozen=True)
+class AlternativeDimensionEvaluation:
+    """A4: the supplied-context outcome for ONE declared dimension of an alternative.
+
+    ``outcome`` is ``matched`` (dimension identity + resolvable supplied value
+    + value equality with the declared constraint), ``mismatched`` (both sides
+    resolvable but the values differ), or ``unresolved`` (the dimension is
+    absent from the supplied selector — ``supplied_state`` is ``ABSENT`` — or
+    either side carries a non-SUCCESS truth state, recorded verbatim).
+    """
+
+    dimension: str  # ContextDimension value declared by the alternative
+    key: str
+    outcome: str
+    declared_state: str  # TruthState value declared by the alternative
+    supplied_state: str  # TruthState value in the supplied selector, or ABSENT
+    declared_value: Any = None
+    supplied_value: Any = None
+
+    def __post_init__(self) -> None:
+        if not self.dimension.strip():
+            raise ModelValidationError("AlternativeDimensionEvaluation.dimension is required")
+        if not self.key.strip():
+            raise ModelValidationError("AlternativeDimensionEvaluation.key is required")
+        if self.outcome not in (_OUTCOME_MATCHED, _OUTCOME_MISMATCHED, _OUTCOME_UNRESOLVED):
+            raise ModelValidationError(
+                f"AlternativeDimensionEvaluation.outcome '{self.outcome}' is not one of "
+                f"{_OUTCOME_MATCHED}/{_OUTCOME_MISMATCHED}/{_OUTCOME_UNRESOLVED}"
+            )
+        known_states = {s.value for s in TruthState}
+        if self.declared_state not in known_states:
+            raise ModelValidationError(
+                f"AlternativeDimensionEvaluation.declared_state '{self.declared_state}' is not a TruthState value"
+            )
+        if self.supplied_state not in known_states | {_SUPPLIED_ABSENT}:
+            raise ModelValidationError(
+                f"AlternativeDimensionEvaluation.supplied_state '{self.supplied_state}' is not a TruthState value or ABSENT"
+            )
+
+
+@dataclass(frozen=True)
+class AlternativeEvaluation:
+    """A4: per-alternative evaluation evidence — id, context-compatibility, and
+    the supplied-context outcome for every declared dimension."""
+
+    alternative_id: str
+    compatible: bool
+    dimension_evaluations: tuple[AlternativeDimensionEvaluation, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.alternative_id.strip():
+            raise ModelValidationError("AlternativeEvaluation.alternative_id is required")
+        if not isinstance(self.compatible, bool):
+            raise ModelValidationError("AlternativeEvaluation.compatible must be a bool")
+        for e in self.dimension_evaluations:
+            e.__post_init__()
+
+
+@dataclass(frozen=True)
+class StateNarrowingStep:
+    """A4: one monotonic narrowing step of the W9 decision state (from → to, with reason)."""
+
+    from_state: str  # AutonomyDecisionState value before the step
+    to_state: str  # AutonomyDecisionState value after the step
+    reason: str
+
+    def __post_init__(self) -> None:
+        known_states = {s.value for s in AutonomyDecisionState}
+        if self.from_state not in known_states:
+            raise ModelValidationError(
+                f"StateNarrowingStep.from_state '{self.from_state}' is not an AutonomyDecisionState value"
+            )
+        if self.to_state not in known_states:
+            raise ModelValidationError(
+                f"StateNarrowingStep.to_state '{self.to_state}' is not an AutonomyDecisionState value"
+            )
+        if not self.reason.strip():
+            raise ModelValidationError("StateNarrowingStep.reason is required")
+
+
 @dataclass(frozen=True)
 class PolicySelection:
-    """Result of selecting among alternatives against context (F04)."""
+    """Result of selecting among alternatives against context (F04).
+
+    A4 (strictly additive fields, safe defaults so previously persisted records
+    remain loadable): ``alternative_evaluations`` carries the per-alternative
+    evaluation evidence; ``inherited_state`` records the inherited W9 decision
+    state; ``narrowing_chain`` records the monotonic steps (from → to, with
+    reason) that produced the final ``state`` from ``inherited_state``.
+    """
 
     selected_id: str
     state: str  # AutonomyDecisionState value
@@ -202,13 +373,98 @@ class PolicySelection:
     alternatives_evaluated: int
     rationale: str
     traceability: Traceability
+    alternative_evaluations: tuple[AlternativeEvaluation, ...] = ()
+    inherited_state: str = ""  # AutonomyDecisionState value
+    narrowing_chain: tuple[StateNarrowingStep, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.selected_id.strip():
             raise ModelValidationError("PolicySelection.selected_id is required")
         if not self.rationale.strip():
             raise ModelValidationError("PolicySelection.rationale is required")
+        known_states = {s.value for s in AutonomyDecisionState}
+        if self.inherited_state and self.inherited_state not in known_states:
+            raise ModelValidationError(
+                f"PolicySelection.inherited_state '{self.inherited_state}' is not an AutonomyDecisionState value"
+            )
+        for evaluation in self.alternative_evaluations:
+            evaluation.__post_init__()
+        for step in self.narrowing_chain:
+            step.__post_init__()
         self.traceability.validate(require_value=True, require_context=True)
+
+
+def _evaluate_alternative_dimensions(
+    alt: PolicyAlternative,
+    supplied: Mapping[tuple[str, str], ContextValue],
+) -> tuple[AlternativeDimensionEvaluation, ...]:
+    """A1: evaluate every dimension an alternative DECLARES against the SUPPLIED context.
+
+    The alternative's selector is a predicate, not a self-declaration: for each
+    declared dimension (dimension identity + key) the supplied selector must
+    contain a corresponding resolvable (SUCCESS) value equal to the declared
+    constraint value. Absent, non-SUCCESS (on either side), or value-mismatched
+    supplied context makes the dimension — and therefore the alternative — not
+    context-compatible. A SUCCESS flag on the alternative's own declaration
+    alone never implies compatibility.
+    """
+    results: list[AlternativeDimensionEvaluation] = []
+    for declared in alt.selector.dimensions:
+        supplied_value = supplied.get((declared.dimension.value, declared.key))
+        if supplied_value is None:
+            results.append(
+                AlternativeDimensionEvaluation(
+                    dimension=declared.dimension.value,
+                    key=declared.key,
+                    outcome=_OUTCOME_UNRESOLVED,
+                    declared_state=declared.value.state.value,
+                    supplied_state=_SUPPLIED_ABSENT,
+                    declared_value=declared.value.value,
+                    supplied_value=None,
+                )
+            )
+            continue
+        if (
+            supplied_value.value.state != TruthState.SUCCESS
+            or declared.value.state != TruthState.SUCCESS
+        ):
+            results.append(
+                AlternativeDimensionEvaluation(
+                    dimension=declared.dimension.value,
+                    key=declared.key,
+                    outcome=_OUTCOME_UNRESOLVED,
+                    declared_state=declared.value.state.value,
+                    supplied_state=supplied_value.value.state.value,
+                    declared_value=declared.value.value,
+                    supplied_value=supplied_value.value.value,
+                )
+            )
+            continue
+        if supplied_value.value.value != declared.value.value:
+            results.append(
+                AlternativeDimensionEvaluation(
+                    dimension=declared.dimension.value,
+                    key=declared.key,
+                    outcome=_OUTCOME_MISMATCHED,
+                    declared_state=declared.value.state.value,
+                    supplied_state=supplied_value.value.state.value,
+                    declared_value=declared.value.value,
+                    supplied_value=supplied_value.value.value,
+                )
+            )
+            continue
+        results.append(
+            AlternativeDimensionEvaluation(
+                dimension=declared.dimension.value,
+                key=declared.key,
+                outcome=_OUTCOME_MATCHED,
+                declared_state=declared.value.state.value,
+                supplied_state=supplied_value.value.state.value,
+                declared_value=declared.value.value,
+                supplied_value=supplied_value.value.value,
+            )
+        )
+    return tuple(results)
 
 
 def select_policy(
@@ -218,72 +474,126 @@ def select_policy(
     w9_decision_state: AutonomyDecisionState = AutonomyDecisionState.ASK,
     traceability: Traceability,
 ) -> PolicySelection:
-    """Select among declared policy/candidate alternatives against context (F04).
+    """Select among declared policy/candidate alternatives against the SUPPLIED context (F04).
 
-    SOS-W10-F04: deterministically evaluates each declared alternative against the
-    supplied contextual selector. An alternative is context-compatible when its
-    own ``PolicyAlternative.selector`` dimensions are all SUCCESS. Among
-    context-compatible alternatives, selects by (priority, id). If no alternative
-    is context-compatible, selects the highest-priority one and narrows to ASK.
-    W9 state is inherited and may only narrow.
+    SOS-W10-F04 / A1: deterministically evaluates each declared alternative as
+    a predicate over the SUPPLIED ``selector``: an alternative is
+    context-compatible only when every dimension it declares is matched by the
+    supplied context — same dimension identity (dimension + key), a resolvable
+    (SUCCESS) supplied value, and value equality with the alternative's
+    declared constraint. A SUCCESS flag on the alternative's own declaration
+    alone never implies compatibility. Among context-compatible alternatives
+    the selection order is (priority, id). If no alternative is
+    context-compatible, the highest-priority alternative is carried as the
+    proposal and the state is narrowed.
+
+    A2: every non-SUCCESS truth state in the supplied selector (FAILED and
+    EMPTY included) narrows the decision; no non-SUCCESS state is collapsed
+    into success.
+
+    A3: W9 state is inherited and may only narrow — monotonically
+    (``narrow_decision_state``): inherited REJECT/ROLLBACK survive, ACT may
+    narrow to ASK, nothing ever widens.
+
+    A4: the result records per-alternative evaluation evidence, the inherited
+    W9 state, and the narrowing chain (inherited → final, with reasons).
     """
     if not alternatives:
         raise ModelValidationError("select_policy requires at least one alternative")
     selector.validate()
 
-    # Evaluate each alternative's own selector against SUCCESS context
-    compatible: list[PolicyAlternative] = []
-    incompatible: list[PolicyAlternative] = []
-    for alt in alternatives:
-        # PolicyAlternative.__post_init__ already validates; just check context
-        all_resolved = all(
-            d.value.state == TruthState.SUCCESS
-            for d in alt.selector.dimensions
-        )
-        if all_resolved:
-            compatible.append(alt)
-        else:
-            incompatible.append(alt)
+    # A1: index the SUPPLIED context by (dimension, key); the first occurrence
+    # wins so duplicate supplied entries are resolved deterministically.
+    supplied: dict[tuple[str, str], ContextValue] = {}
+    for d in selector.dimensions:
+        supplied.setdefault((d.dimension.value, d.key), d)
 
-    state = w9_decision_state.value
+    evaluations: list[AlternativeEvaluation] = []
+    for alt in alternatives:
+        dimension_evaluations = _evaluate_alternative_dimensions(alt, supplied)
+        evaluations.append(
+            AlternativeEvaluation(
+                alternative_id=alt.id,
+                compatible=all(e.outcome == _OUTCOME_MATCHED for e in dimension_evaluations),
+                dimension_evaluations=dimension_evaluations,
+            )
+        )
+
+    compatible = [alt for alt, evaluation in zip(alternatives, evaluations) if evaluation.compatible]
+
+    state = w9_decision_state
+    narrowing: list[StateNarrowingStep] = []
 
     if compatible:
         # Sort compatible alternatives by (priority, id) for deterministic selection
-        compatible.sort(key=lambda a: (a.priority, a.id))
-        selected = compatible[0]
+        ordered = sorted(compatible, key=lambda a: (a.priority, a.id))
+        selected = ordered[0]
         rationale = (
             f"selected alternative '{selected.id}' (priority {selected.priority}); "
-            f"context-compatible; {len(compatible)} compatible of {len(alternatives)} evaluated; "
-            f"W9 state {w9_decision_state.value} preserved"
+            f"context-compatible with supplied selector '{selector.id}' v{selector.version}; "
+            f"{len(compatible)} compatible of {len(alternatives)} evaluated; "
+            f"W9 state {w9_decision_state.value} inherited"
         )
     else:
-        # No context-compatible alternative — select highest-priority and narrow to ASK
-        sorted_alts = sorted(alternatives, key=lambda a: (a.priority, a.id))
-        selected = sorted_alts[0]
-        state = AutonomyDecisionState.ASK.value
+        # No context-compatible alternative — carry the highest-priority
+        # alternative as the proposal and narrow monotonically (A3).
+        ordered = sorted(alternatives, key=lambda a: (a.priority, a.id))
+        selected = ordered[0]
+        narrowed = narrow_decision_state(state, AutonomyDecisionState.ASK)
+        if narrowed != state:
+            narrowing.append(
+                StateNarrowingStep(
+                    from_state=state.value,
+                    to_state=narrowed.value,
+                    reason=(
+                        "no context-compatible alternative; "
+                        f"narrowed {state.value} -> {narrowed.value} per C4"
+                    ),
+                )
+            )
+        state = narrowed
         rationale = (
             f"selected alternative '{selected.id}' (priority {selected.priority}); "
-            f"no context-compatible alternative; narrowed to ASK; "
+            f"no alternative context-compatible with supplied selector '{selector.id}' v{selector.version}; "
+            f"monotonic narrowing {w9_decision_state.value} -> {state.value} per C4; "
             f"{len(alternatives)} evaluated"
         )
 
-    # Also check the top-level selector for unresolved context
-    has_unresolved = any(
-        d.value.state in (TruthState.UNKNOWN, TruthState.UNAVAILABLE, TruthState.UNSUPPORTED)
+    # A2: EVERY non-SUCCESS supplied truth state narrows the decision
+    # (FAILED and EMPTY included); A3: monotonically, never widening.
+    unresolved = [
+        (d.dimension.value, d.key, d.value.state)
         for d in selector.dimensions
-    )
-    if has_unresolved:
-        state = AutonomyDecisionState.ASK.value
-        rationale += "; top-level selector has unresolved context; ASK"
+        if d.value.state != TruthState.SUCCESS
+    ]
+    if unresolved:
+        detail = "; ".join(f"{dim}:{key} is {st.value}" for dim, key, st in unresolved)
+        narrowed = narrow_decision_state(state, AutonomyDecisionState.ASK)
+        if narrowed != state:
+            narrowing.append(
+                StateNarrowingStep(
+                    from_state=state.value,
+                    to_state=narrowed.value,
+                    reason=(
+                        f"supplied context unresolved ({detail}); "
+                        f"narrowed {state.value} -> {narrowed.value} per C4"
+                    ),
+                )
+            )
+            state = narrowed
+        rationale += f"; supplied selector has non-SUCCESS truth state(s): {detail}; final state {state.value}"
 
     return PolicySelection(
         selected_id=selected.id,
-        state=state,
+        state=state.value,
         selector_id=selector.id,
         selector_version=selector.version,
         alternatives_evaluated=len(alternatives),
         rationale=rationale,
         traceability=traceability,
+        alternative_evaluations=tuple(evaluations),
+        inherited_state=w9_decision_state.value,
+        narrowing_chain=tuple(narrowing),
     )
 
 
@@ -306,8 +616,12 @@ def evaluate_personalization(
 ) -> PersonalizationDecision:
     """Evaluate a personalization decision deterministically (C3, C4, C8, C9, F02).
 
-    - C3 (F01): inherits W9 decision state; may only narrow.
-    - C4: unknown/unavailable context routes to ASK.
+    - C3 (F01/A3): inherits the W9 decision state and may only narrow —
+      monotonically in the W9 lattice (``narrow_decision_state``), so an
+      inherited REJECT/ROLLBACK is never widened to ASK;
+    - C4 (A2): EVERY non-SUCCESS supplied truth state (FAILED and EMPTY
+      included) narrows the decision — no non-SUCCESS state is collapsed into
+      success, so a FAILED context can never silently preserve ACT;
     - C8 (F02): preserves W9 decision ref, evidence ids, alternatives,
       constraints, structured uncertainty.
     - C9: same inputs produce same outputs.
@@ -317,19 +631,30 @@ def evaluate_personalization(
     reasons: list[str] = []
     context_refs: list[str] = []
 
-    state = w9_decision_state.value
-    reasons.append(f"inherited W9 decision state: {state}")
+    state = w9_decision_state
+    reasons.append(f"inherited W9 decision state: {state.value}")
 
     for d in selector.dimensions:
         context_refs.append(f"{d.dimension.value}:{d.key}")
-        if d.value.state in (TruthState.UNKNOWN, TruthState.UNAVAILABLE, TruthState.UNSUPPORTED):
-            if state != AutonomyDecisionState.ASK.value:
-                state = AutonomyDecisionState.ASK.value
-            reasons.append(f"context '{d.key}' state is {d.value.state.value}; narrowed to ASK")
+        # A2: every non-SUCCESS truth state narrows (FAILED/EMPTY included);
+        # A3: monotonically — an inherited REJECT/ROLLBACK is preserved.
+        if d.value.state != TruthState.SUCCESS:
+            narrowed = narrow_decision_state(state, AutonomyDecisionState.ASK)
+            if narrowed != state:
+                reasons.append(
+                    f"context '{d.key}' state is {d.value.state.value}; "
+                    f"narrowed {state.value} -> {narrowed.value}"
+                )
+                state = narrowed
+            else:
+                reasons.append(
+                    f"context '{d.key}' state is {d.value.state.value}; "
+                    f"inherited {state.value} preserved by monotonic narrowing"
+                )
 
-    if state == AutonomyDecisionState.ACT.value:
-        reasons.append("all context dimensions resolved; W9 ACT preserved")
-    rationale = "personalization authorized within W9 boundary" if state == AutonomyDecisionState.ACT.value else f"personalization narrowed to {state} by W9 boundary or context"
+    if state == AutonomyDecisionState.ACT:
+        reasons.append("all supplied context dimensions resolved; W9 ACT preserved")
+    rationale = "personalization authorized within W9 boundary" if state == AutonomyDecisionState.ACT else f"personalization narrowed to {state.value} by W9 boundary or context"
 
     # F02: structured uncertainty (default UNKNOWN if not supplied)
     if uncertainty is None:
@@ -337,7 +662,7 @@ def evaluate_personalization(
 
     return PersonalizationDecision(
         id="",
-        state=state,
+        state=state.value,
         policy_id=policy.id,
         w9_decision_id=w9_decision_id,
         context_refs=tuple(context_refs),
