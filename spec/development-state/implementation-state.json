@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "program": "SOS-v1",
   "roadmap": "spec/implementation-roadmap.md",
-  "status": "W12_DISPATCHED",
+  "status": "W13_READY_TO_DISPATCH",
   "tasks": {
     "W0": {"status": "BOOTSTRAP_COMPLETE", "dependencies": [], "mergedAs": null, "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"},
     "W1": {"status": "COMPLETE", "dependencies": ["W0"], "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"},
@@ -16,13 +16,13 @@
     "W9": {"status": "COMPLETE", "dependencies": ["W7", "W8"], "mergedAs": "203cfb7590bd25244cabf3cc7299dd192b00948d"},
     "W10": {"status": "COMPLETE", "dependencies": ["W2", "W9"], "mergedAs": "a1778653c35064eeb9d71563f17b30fb174d9429"},
     "W11": {"status": "COMPLETE", "dependencies": ["W1", "W2", "W9"], "mergedAs": "aae251813d31f5b85e005d4bff94462a84c440df"},
-    "W12": {"status": "DISPATCHED", "dependencies": ["W3", "W4", "W5", "W6", "W7", "W8", "W9"], "mergedAs": null},
-    "W13": {"status": "BLOCKED", "dependencies": ["W8", "W9"], "mergedAs": null},
+    "W12": {"status": "COMPLETE", "dependencies": ["W3", "W4", "W5", "W6", "W7", "W8", "W9"], "mergedAs": "933e1e9ce32f25a1261329aa87038b6c4e5fd084"},
+    "W13": {"status": "READY", "dependencies": ["W8", "W9"], "mergedAs": null},
     "W14": {"status": "BLOCKED", "dependencies": ["W10", "W11", "W12", "W13"], "mergedAs": null},
     "W15": {"status": "BLOCKED", "dependencies": ["W14"], "mergedAs": null}
   },
-  "currentFrontier": ["W12"],
-  "currentTask": "W12",
+  "currentFrontier": ["W13"],
+  "currentTask": "W13",
   "notes": [
     "W8 is authoritatively merged as 65b84058aa204b3749e45b7e21ae433a4b138d83 after exact-head Architect review and successful exact-head CI run #157.",
     "W9 is authoritatively merged as 203cfb7590bd25244cabf3cc7299dd192b00948d from exact reviewed Worker head e85b4168837820761c74c8084215296e4ae192de; exact-head CI run #171 succeeded.",
@@ -31,8 +31,11 @@
     "W11 is dispatched by spec/work-orders/W11-execution-substrate.md against live post-merge main a1778653c35064eeb9d71563f17b30fb174d9429; it is the first bounded slice of greenfield realization (provider-neutral execution substrate per the PREP-W11 verified contract).",
     "W11 is authoritatively merged as aae251813d31f5b85e005d4bff94462a84c440df (merge of PR #18, exact reviewed head 7cca0266444bfd9809dcd4549d1be4bdaad282bd, exact-head CI green, 327 passed) after operator-delegated TL self-approval (evidence: W11-GATE-SELF-APPROVAL, replay evidence dir). The substrate-level greenfield realization mechanism is complete; deeper onboarding slices may be ordered by the operator/Architect.",
     "W12 is dispatched by spec/work-orders/W12-optimization-loop.md against live post-merge main aae251813d31f5b85e005d4bff94462a84c440df (first bounded slice: the governed brownfield optimization loop orchestrator composing the merged W3/W4/W5/W6/W7/W8/W9/W11 authorities).",
-    "W13/W14/W15 remain blocked until their frozen dependencies merge.",
+    "W13/W14/W15 preparation packages (work orders, designs, W13 checkpoint template) are committed on main below the W12 merge and are now dispatch-unblocked; W13 is READY and is the current frontier.",
     "All later status must be reconciled from actual Git merge evidence.",
-    "Never treat this file's projections as stronger than Git history or frozen architecture."
+    "Never treat this file's projections as stronger than Git history or frozen architecture.",
+    "W12 is authoritatively merged as 933e1e9ce32f25a1261329aa87038b6c4e5fd084 (merge of PR #19, exact reviewed head fd6d20f875ff3d52ceec6c3100548be57be34e61). Gate: operator-delegated TL review under explicit operator chat instruction 2026-09-30 ('You review and decide what to do for W12'); review packet recorded as PR #19 review 5361283423 (COMMENT form: GitHub self-approval protection rejected the formal APPROVE event because PR author and reviewing PAT share the org account). Exact-head verification re-run fresh by the reviewer: pytest 360 passed (327 baseline re-verified + 33 W12), compileall clean, CI runs 200/201 success, five-file surface verified, merge-tree conflict-free.",
+    "W12 non-blocking findings recorded for later governed slices: W12-NB1 lifecycle-FAILED vs truth-axis preservation (C7 holds via verbatim W4 evidence); W12-NB2 candidate id-order is processing order, not value ranking; W12-NB3 OptimizationRun.validate could re-assert promotion.experiment_id == iteration.experiment_id directly at the run boundary (sanctioned constructor apply_promotion already enforces it).",
+    "For W13/W14/W15 the intended discipline is a strict independent Architect gate (an independent reviewer session, not the implementing/verifying TL) unless the operator explicitly delegates again; any such delegation must be recorded as governance debt, as done for W10/W11/W12."
   ]
 }

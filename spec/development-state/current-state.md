@@ -1,71 +1,58 @@
 # SOS Current State
 
-**Status:** Informational projection reconciled to live Git as of 2026-09-29 (TL takeover reconciliation).
+**Status:** Informational projection reconciled to live Git as of 2026-09-30 (W12 merge reconciliation).
 
 ## Program
 
-SOS-v1 W0 governance foundation through W11 provider-neutral execution substrate are authoritatively merged. W12 brownfield optimization loop is the active implementation frontier: implemented on PR #19, verified, and at `WAITING_FOR_ARCHITECT` awaiting the independent Architect gate.
+SOS-v1 W0 governance foundation through W12 brownfield optimization loop are authoritatively merged. W13 self-evolution is the current implementation frontier: its Work Order, design, and checkpoint template were prepared on main before the W12 merge and are now dispatch-unblocked, awaiting worker dispatch and a strict independent Architect gate.
 
 ## Repository State
 
 - Architecture Version: `1.0` frozen
 - Roadmap Version: `1.0` frozen
-- Last Completed Work Order: `W11` (merge `aae251813d31f5b85e005d4bff94462a84c440df`, PR #18)
+- Last Completed Work Order: `W12` (merge `933e1e9ce32f25a1261329aa87038b6c4e5fd084`, PR #19)
+- W11 Merge SHA: `aae251813d31f5b85e005d4bff94462a84c440df` (PR #18)
 - W10 Merge SHA: `a1778653c35064eeb9d71563f17b30fb174d9429` (PR #17)
-- Live `main` SHA: recompute from live Git — the W12 dispatch/reconciliation point was `e3a97b895ca7f6cc7206a50bde45b2b55c554195`; this TL reconciliation commit advances `main` beyond it without changing any frozen semantics.
-- Active Work Order: `W12 — Brownfield Optimization Loop (first bounded slice)`
-- Active PR: `#19` (branch `work/w12-optimization-loop`, base `e3a97b895ca7f6cc7206a50bde45b2b55c554195`)
-- PR #19 head: `fd6d20f875ff3d52ceec6c3100548be57be34e61` (2 commits: implementation `cba274710ba3c76a883edbf4a91f836b57279e83` + docs/checkpoint `fd6d20f`)
-- Current frontier: `W12`
-- Machine state: `spec/development-state/implementation-state.json` → `W12_DISPATCHED`, `currentFrontier = ["W12"]` (verified current)
+- Live `main` SHA: recompute from live Git — the W12 merge is `933e1e9ce32f25a1261329aa87038b6c4e5fd084` (merge of PR #19 into the prepared-main `9ad4737f...`); this TL reconciliation commit advances `main` beyond it without changing any frozen semantics.
+- Merged W12 reviewed head: `fd6d20f875ff3d52ceec6c3100548be57be34e61` (implementation `cba274710ba3c76a883edbf4a91f836b57279e83` + docs/checkpoint `fd6d20f`)
+- Current frontier: `W13`
+- Machine state: `spec/development-state/implementation-state.json` → `W13_READY_TO_DISPATCH`, `currentFrontier = ["W13"]`, `W12 = COMPLETE/933e1e9c...` (verified current)
 
-## W12 verification state (TL independent review, 2026-09-29)
+## W12 gate record (operator-delegated TL review, 2026-09-30)
 
-The incoming Tech Lead performed an independent review of PR #19 at the exact head `fd6d20f875ff3d52ceec6c3100548be57be34e61`:
+The W12 Architect gate was concluded by the incoming Tech Lead under the operator's explicit chat delegation ("You review and decide what to do for W12", 2026-09-30). The full review packet is recorded on PR #19 as review `5361283423` (COMMENT form: GitHub's self-approval protection rejected the formal APPROVE event because the PR author and the reviewing PAT share the org account; the approval is equivalently recorded in the merge, this file, and `implementation-state.json`).
 
-- `python -m pytest` → **360 passed** (0 failed, 0 errors, 0 skipped) at exact head
-- `python -m compileall -q src tests` → clean at exact head
-- GitHub Actions `pytest` workflow → success on the exact head (2 completed runs)
-- PR #19 → open, mergeable, **zero submitted reviews** — the Architect gate has NOT been given
+Independent verification performed fresh by the reviewer at the exact head `fd6d20f...` (sandbox-reset environment, no reliance on prior recorded results):
 
-Review verdict: W12 satisfies C1–C10; every consequential step composes the real pre-existing authorities (W3/W4/W5/W6/W7/W8/W9/W11); ASK pauses via an unautoapprovable pending record; W7-before-W8 is mechanically enforced; DEPLOY-class promotion requires PromotionGate + ACT + bounded RollbackPath + successful W11 receipt; truth-state distinctions (FAILED/UNKNOWN/UNAVAILABLE/UNSUPPORTED) survive the chain verbatim; records round-trip through W1 `JsonModelStore`; no W13/W14/live-execution symbols. Two non-blocking notes recorded for the Architect:
+- `python3 -m pytest` → **360 passed** (0 failed / 0 errors / 0 skipped) = 327 baseline (re-verified at base `e3a97b8`) + 33 W12 items
+- `python3 -m compileall -q src tests` → clean
+- GitHub Actions `pytest` on the exact head → 2/2 success (runs 200, 201)
+- Diff surface: exactly the five Work-Order-allowed files; zero W1–W11 source / frozen spec / roadmap / Constitution changes
+- Merge against prepared main `9ad4737f` → conflict-free
 
-1. Non-SUCCESS experiment outcomes map the W8 *lifecycle* terminal state to `FAILED`, while the W4 evidence record preserves the exact truth state — lifecycle axis vs truth axis, no collapse (C7 holds).
-2. Candidate iteration order is content-addressed-id order (deterministic by design, C6); it neither consults nor overrides W6 ranking. If a governed value-ranking later becomes loop input, the ordering contract must be revisited explicitly — it is a processing order, never a value claim.
+Verdict: W12 satisfies C1–C10 and the Work Order's required outcomes; no protocol hard stop triggered. All seven review focuses recorded in the prior reconciliation were verified: authority gating at every consequential step (three W9 gates + W7 + W8 gate + W11 substrate gates); MODEL_ONLY promotion stays internal model state (no receipt claim); rollback evidence is explicitly labeled a model-only lifecycle transition; truth-state distinctions survive the chain end-to-end; cross-authority references are exact and content-addressed; deterministic id-ordering is processing order only (no silent value-ranking replacement); the W11 seam cannot become an authority (per-dispatch registries, injected providers, substrate's own gates).
 
-## Governance note (W10/W11 approval history)
+Non-blocking findings recorded for later governed slices (see `implementation-state.json` notes): `W12-NB1` (lifecycle-FAILED vs truth-axis), `W12-NB2` (id-order processing, not value ranking), `W12-NB3` (run-boundary promotion↔iteration binding could be re-asserted directly; sanctioned constructor already enforces it).
 
-W10 and W11 are authoritatively merged (Git state ✅) but were accepted via **operator-delegated TL self-approval** rather than independent Architect review — weaker governance confidence than the intended process (recorded in `implementation-state.json` notes). Per operator directive: do NOT rewrite history or reopen W10/W11 absent an actual semantic defect surfaced by later integration evidence. For W12/W13/W14/W15, strict independent Architect-gate discipline is restored: TL verification supports, but never replaces, the Architect's approval.
+## Governance note (approval history)
+
+W10, W11, and W12 are authoritatively merged (Git state ✅) but each was accepted via **operator-delegated TL self-approval** rather than an independent Architect review — weaker governance confidence than the intended process (recorded per wave in `implementation-state.json` notes). Per operator directive: do NOT rewrite history or reopen merged waves absent an actual semantic defect surfaced by later integration evidence. For W13/W14/W15, strict independent Architect-gate discipline is the intended default (an independent reviewer session, not the implementing/verifying TL) unless the operator explicitly delegates again; any such delegation must be recorded as governance debt, as done for W10/W11/W12.
 
 ## Dependency proof
 
-W12 was dispatched against post-W11-merge main with all frozen dependencies (W3 `6541441b`, W4 `26060db5`, W5 `2bfd0f89`, W6 `b5171f70`, W7 `25f663cf`, W8 `65b84058`, W9 `203cfb75`, W11 substrate `aae25181`) authoritatively merged in the branch ancestry.
+W12 merged against prepared main with all frozen dependencies (W3 `6541441b`, W4 `26060db5`, W5 `2bfd0f89`, W6 `b5171f70`, W7 `25f663cf`, W8 `65b84058`, W9 `203cfb75`, W11 substrate `aae25181`) authoritatively merged in the branch ancestry.
 
-W13/W14/W15 are PREPARED (spec packages committed by this reconciliation) but dispatch-blocked until the W12 merge exists in Git and canonical state records it.
-
-## Prepared successor packages (this commit; dispatch-blocked)
+## Successor packages (dispatch-unblocked)
 
 - `spec/work-orders/W13-self-evolution.md` + `docs/implementation/W13-SELF-EVOLUTION-DESIGN.md` + `spec/development-state/W13-checkpoint.md` (template only)
 - `spec/work-orders/W14-dogfood-adversarial-verification.md` + `docs/implementation/W14-DOGFOOD-ADVERSARIAL-DESIGN.md`
 - `spec/work-orders/W15-final-architect-gate.md` + `docs/implementation/W15-FINAL-GATE-DESIGN.md`
 
-Preparation artifacts are based on current `main`, the frozen architecture/roadmap, and already-authoritative merged work only — no unmerged sibling (including PR #19) is treated as an authoritative dependency.
-
-## Active review findings
-
-PR #19 remains at `WAITING_FOR_ARCHITECT` (checkpoint review iteration 1). The next review (Architect) must verify at minimum:
-
-1. Every consequential step is genuinely gated by the correct pre-existing authority (C1).
-2. MODEL_ONLY promotion remains clearly internal model state, never evidence of external change (C4/C8).
-3. Rollback evidence distinguishes a modeled lifecycle transition from actual external recovery (C5).
-4. All truth-state distinctions survive the entire chain (C7).
-5. Cross-authority references are exact and content-addressed (C1, `OptimizationRun.validate`).
-6. Deterministic id-ordering is acceptable for the current W6 candidate model without silently replacing a future governed value-ranking mechanism (C6).
-7. The optional W11 seam remains incapable of becoming an authority (C8).
+W13 is READY: dispatch requires a worker session and must hold the W13 gate to an independent Architect unless the operator delegates otherwise.
 
 ## Recovery path
 
-`live main → implementation roadmap → implementation-state.json → PR #19 → spec/work-orders/W12-optimization-loop.md → W12 checkpoint/design at exact head → frozen architecture/requirements/constitution → TL-FINAL-HANDOFF.md`
+`live main → implementation roadmap → implementation-state.json → spec/work-orders/W13-self-evolution.md → W13 design/checkpoint → frozen architecture/requirements/constitution → TL-FINAL-HANDOFF.md`
 
 ## Important
 
