@@ -11,7 +11,7 @@ dispatched at the post-W12-merge base `0da1ca09885b0cc618cdddebc6da5acfc3f0c978`
 W9 merged `203cfb7` (W8 + W9 are the frozen-ledger declared dependencies).
 Roadmap sequencing gate: W12 — merged (PR #19) before W13 dispatch; W13 does
 not depend on W12 implementation internals.
-**Module (implemented):** `src/sos/selfevolution.py` (2097 lines); W13 exports
+**Module (implemented):** `src/sos/selfevolution.py` (2107 lines); W13 exports
 in `src/sos/__init__.py` (+25 lines, 23 names); contract tests
 `tests/test_w13_selfevolution.py` (78 test items in 42 test functions)
 
