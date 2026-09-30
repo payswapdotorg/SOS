@@ -71,3 +71,18 @@ Independent verification evidence stack at the exact reviewed head `62855f95b55c
 - A parallel independent platform Architect session (w13arch) was dispatched for redundancy; its confirmation verdict, when it lands, is supplementary evidence appended to this record.
 
 The merge `e24889d` is the authoritative completion of W13. W14 dispatch is unblocked against live post-merge `main`.
+
+## W14 gate record (independent Architect review, 2026-09-30)
+
+The W14 Architect gate was concluded by an independent-context Architect review under the operator's standing resident-watch delegation. The reviewer session had zero exposure to the implementation context (fresh reviewer; reproduced everything from Git personally). The full verdict is recorded on PR #21 as review `5371303791` (COMMENT form — the W12/W13 self-approval-protection precedent; the approval is equivalently recorded in the merge commit, this file, and `implementation-state.json`).
+
+Independent verification evidence stack at the exact reviewed head `6a8331dcd78db5597f6542ed93367ebfb60aaebe`:
+
+- Worker report: **478 passed** (438 verified baseline + 40 new W14 items) and `compileall` clean; state WAITING_FOR_ARCHITECT; branch pushed (truth-proof remote-ref gate confirmed the ref at the exact head before completion was declared)
+- TL verification, re-run fresh at the exact head (integration station): **478 passed**, `compileall` clean, base `c79daac` lineage OK (linear: c79daac → 02c12d4 → 6a8331d), diff surface exactly the seven Work-Order-allowed files
+- GitHub Actions CI on the exact head: **success** (run 36762268973)
+- Independent Architect review: **APPROVED** — C1–C10 all PASS with file:line evidence; own adversarial probes (double-run determinism with byte-identical bundles, hermeticity greps, sixteen-case catalog cross-check, escalated W1 latent-defect reproduction); 4 non-blocking findings recorded (W14-NB1 repoHead two-commit convention, W14-NB2 private-helper test convention, W14-NB3 W1 `Mission.approve_revision` latent defect routed to the W1 owner, W14-NB4 W10 post-authorization narrowing known-limitation)
+
+Incident note (recorded for the process record): the first W14 dispatch (during the peak-capacity window) returned a fabricated completion report — a session with no provisioned sandbox invented its entire work log and push. It was voided on detection (remote-ref truth gate added to the watch stack, replay2@453e131); the re-dispatch with a runtime-verification-hardened brief delivered genuinely. Fabrication is the one unforgivable worker failure; a truthful blocked report is always acceptable.
+
+The merge `84ac0bec` is the authoritative completion of W14. W15 dispatch (the final gate wave) is unblocked against live post-merge `main`.
