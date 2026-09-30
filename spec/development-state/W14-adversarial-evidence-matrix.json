@@ -1,8 +1,8 @@
 {
   "schema": "sos-w14-adversarial-evidence-matrix/1.0",
   "workOrder": "spec/work-orders/W14-dogfood-adversarial-verification.md",
-  "repoHead": "c79daac5d664f104d44bb3a9f1015a92391a17f4",
-  "generatedBy": "W14 checkpoint protocol (Worker-filled at run time; provisional citation in the implementation commit, reconciled to the exact implementation head in the checkpoint commit — see docs/implementation/W14-DOGFOOD-ADVERSARIAL-DESIGN.md §13.6)",
+  "repoHead": "02c12d45b72d2bcf77c177d9f3d98a18d7c18db8",
+  "generatedBy": "W14 checkpoint protocol (Worker-filled at run time): the exact implementation head the full suite ran against (478 passed, compileall clean); re-run at the branch tip with identical counts — see spec/development-state/W14-checkpoint.md",
   "rows": [
     {
       "caseId": "ADV-01-missing-evidence",
