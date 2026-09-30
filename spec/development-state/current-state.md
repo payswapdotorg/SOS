@@ -1,22 +1,22 @@
 # SOS Current State
 
-**Status:** Informational projection reconciled to live Git as of 2026-09-30 (W12 merge reconciliation).
+**Status:** Informational projection reconciled to live Git as of 2026-09-30 (W13 merge reconciliation).
 
 ## Program
 
-SOS-v1 W0 governance foundation through W12 brownfield optimization loop are authoritatively merged. W13 self-evolution is the current implementation frontier: its Work Order, design, and checkpoint template were prepared on main before the W12 merge and are now dispatch-unblocked, awaiting worker dispatch and a strict independent Architect gate.
+SOS-v1 W0 governance foundation through W13 self-evolution are authoritatively merged. W14 (full dogfood / adversarial verification — the integrated verification program) is the current frontier: its Work Order and design were prepared on main and are dispatch-unblocked now that all four frozen dependencies (W10, W11, W12, W13) carry authoritative merge SHAs.
 
 ## Repository State
 
 - Architecture Version: `1.0` frozen
 - Roadmap Version: `1.0` frozen
-- Last Completed Work Order: `W12` (merge `933e1e9ce32f25a1261329aa87038b6c4e5fd084`, PR #19)
+- Last Completed Work Order: `W13` (merge `e24889df4dd3a846d759dd583c27609b3b9220d2`, PR #20)
 - W11 Merge SHA: `aae251813d31f5b85e005d4bff94462a84c440df` (PR #18)
 - W10 Merge SHA: `a1778653c35064eeb9d71563f17b30fb174d9429` (PR #17)
 - Live `main` SHA: recompute from live Git — the W12 merge is `933e1e9ce32f25a1261329aa87038b6c4e5fd084` (merge of PR #19 into the prepared-main `9ad4737f...`); this TL reconciliation commit advances `main` beyond it without changing any frozen semantics.
 - Merged W12 reviewed head: `fd6d20f875ff3d52ceec6c3100548be57be34e61` (implementation `cba274710ba3c76a883edbf4a91f836b57279e83` + docs/checkpoint `fd6d20f`)
-- Current frontier: `W13`
-- Machine state: `spec/development-state/implementation-state.json` → `W13_READY_TO_DISPATCH`, `currentFrontier = ["W13"]`, `W12 = COMPLETE/933e1e9c...` (verified current)
+- Current frontier: `W14`
+- Machine state: `spec/development-state/implementation-state.json` → `W14_READY_TO_DISPATCH`, `currentFrontier = ["W14"]`, `W13 = COMPLETE/e24889df...` (verified current)
 
 ## W12 gate record (operator-delegated TL review, 2026-09-30)
 
@@ -57,3 +57,17 @@ W13 is READY: dispatch requires a worker session and must hold the W13 gate to a
 ## Important
 
 This file is not an authorization source. Recompute status from actual Git and canonical machine state before implementation or merge. Completion requires Architect approval, actual Git merge, and canonical reconciliation.
+
+## W13 gate record (independent Architect review, 2026-09-30)
+
+The W13 Architect gate was concluded by an independent-context Architect review under the operator's standing resident-watch delegation ("continuous resident watch: monitor → harvest → review → approve/require-changes → dispatch next, until the roadmap is complete", 2026-09-30). The reviewer session had zero exposure to the implementation context (fresh reviewer; reproduced everything from Git personally). The full verdict is recorded on PR #20 as review `5368791106` (COMMENT form: GitHub's self-approval protection rejected the formal APPROVE event because the PR author and the reviewing PAT share the org account — the W12 precedent; the approval is equivalently recorded in the merge commit, this file, and `implementation-state.json`).
+
+Independent verification evidence stack at the exact reviewed head `62855f95b55c54292ace61b66dcf29d7fa821793`:
+
+- Worker report: **438 passed** (360 verified baseline + 78 new W13 items) and `compileall` clean; state WAITING_FOR_ARCHITECT
+- TL verification, re-run fresh at the exact head (sandbox worktree): **438 passed in 1.42s**, `compileall` clean, base `0da1ca0` lineage OK, diff surface exactly the five Work-Order-allowed files (+4862/-120)
+- GitHub Actions CI on the exact head: **success** (run 36731172770)
+- Independent Architect review: **APPROVED** — C1–C12 all PASS with file:line evidence; adversarial probes (determinism re-runs, frozen-table rejection, meta-depth overflow, forged-record validation, token scans) all green; 3 non-blocking findings recorded (W13-NB1 checkpoint line-count nit, W13-NB2 no fired-StopCondition scenario, W13-NB3 deferral-while-paused marker replacement)
+- A parallel independent platform Architect session (w13arch) was dispatched for redundancy; its confirmation verdict, when it lands, is supplementary evidence appended to this record.
+
+The merge `e24889d` is the authoritative completion of W13. W14 dispatch is unblocked against live post-merge `main`.

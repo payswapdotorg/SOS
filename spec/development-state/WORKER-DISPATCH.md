@@ -4,7 +4,20 @@
 **Dispatch authority:** Architect/TL coordination artifact
 **Repository source of truth:** Git + canonical development state
 
-## Current repository facts (2026-09-29 TL takeover reconciliation)
+## Current repository facts (2026-09-30 W13 merge reconciliation)
+
+- Live `main` at the W13 merge point: `e24889df4dd3a846d759dd583c27609b3b9220d2` (merge of PR #20, exact reviewed head `62855f95b55c54292ace61b66dcf29d7fa821793`, base `0da1ca0`); this reconciliation commit advances `main` beyond it without changing any frozen semantics.
+- W13 gate: APPROVED by an independent-context Architect review 2026-09-30 (operator resident-watch delegation); verdict on PR #20 review 5368791106; cross-evidence TL exact-head verification (438 passed) + CI run 36731172770 success; 3 non-blocking findings recorded in `current-state.md`.
+- Machine state: `spec/development-state/implementation-state.json` → `W14_READY_TO_DISPATCH`, frontier `W14`.
+
+### Current-cycle worker allocation
+
+- **Worker A — W14 implementation** (branch `work/w14-dogfood-adversarial` from live post-merge `main`, base recorded at dispatch; the seven allowed files per the W14 Work Order).
+- **Worker B — W14 adversarial verification support** (independently reviews the W14 delivery when it reaches WAITING_FOR_ARCHITECT; never depends on A's unmerged branch).
+- **Worker C — W15 final-gate preparation review** (the W15 package is prepared; keeps it reconciled to actual Git state; no implementation).
+
+Legacy facts preserved below for the record.
+
 
 - Live `main` at the W12 dispatch point: `e3a97b895ca7f6cc7206a50bde45b2b55c554195` (this reconciliation commit advances `main` beyond it; re-read live `main` before any branch/base decision).
 - W10 merge: `a1778653c35064eeb9d71563f17b30fb174d9429` (PR #17). W11 merge: `aae251813d31f5b85e005d4bff94462a84c440df` (PR #18). Both are Git-authoritative; both carry the recorded governance caveat of operator-delegated TL self-approval (see `current-state.md`).
