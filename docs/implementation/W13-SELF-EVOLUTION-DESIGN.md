@@ -1,19 +1,19 @@
 # W13 Self-Evolution / Meta-Adaptation Design (first bounded slice: the governed self-evolution proposal lifecycle)
 
-**Status:** PREPARED — DISPATCH BLOCKED. This is the pre-implementation
-design reference for the W13 Worker. It MUST be reconciled to the implemented
-contract at checkpoint time (record what was actually built; extend, never
+**Status:** RECONCILED TO THE IMPLEMENTATION (W13 Worker, review iteration 1).
+This was the PREPARED design reference; §§1–12 below are preserved as prepared
+and §13–§15 record the implemented contract reconciliation (extend, never
 weaken — the Work Order remains the authority where the two differ).
-**Work Order:** `spec/work-orders/W13-self-evolution.md` (authoritative once
-dispatched; prepared against live `main`
-`e3a97b895ca6f6cc7206a50bde45b2b55c554195`, the W12 dispatch point)
+**Work Order:** `spec/work-orders/W13-self-evolution.md` (authoritative;
+dispatched at the post-W12-merge base `0da1ca09885b0cc618cdddebc6da5acfc3f0c978`)
 **Dependencies:** W1 merged `091d4d10`; W4 merged `26060db`; W5 merged
 `2bfd0f8`; W6 merged `b5171f7`; W7 merged `25f663c`; W8 merged `65b84058`;
 W9 merged `203cfb7` (W8 + W9 are the frozen-ledger declared dependencies).
-Roadmap sequencing gate: W12 — PR #19 open, unmerged at preparation; W13 is
-NOT dispatched, and never depends on W12 implementation internals.
-**Module (planned):** `src/sos/selfevolution.py`; W13 exports in
-`src/sos/__init__.py`; contract tests `tests/test_w13_selfevolution.py`
+Roadmap sequencing gate: W12 — merged (PR #19) before W13 dispatch; W13 does
+not depend on W12 implementation internals.
+**Module (implemented):** `src/sos/selfevolution.py` (2097 lines); W13 exports
+in `src/sos/__init__.py` (+25 lines, 23 names); contract tests
+`tests/test_w13_selfevolution.py` (78 test items in 42 test functions)
 
 ## 1. Overview and positioning
 
@@ -330,3 +330,172 @@ governing section), §12 (trust boundaries, no fifth authority), §13
 | Origin enum members | `MODEL_GENERATED` / `HUMAN_GENERATED` / `EVIDENCE_TRIGGERED` (extensible only via governed change) |
 | Frozen authority path set | a named constant listing `spec/constitution.md`, `spec/architecture.md`, `spec/architecture-lock.md`, `spec/architecture-change-process.md`, `spec/implementation-roadmap.md`, `spec/requirements.md`, `spec/sos-meta-model.md`, frozen `spec/work-orders/*`, and `spec/development-state/implementation-state.json` (the Worker may extend the constant only with Architect-approved additions) |
 | Authority-module set | a named constant listing the `src/sos/` modules implementing W1/W4/W5/W6/W7/W8/W9 authorities (DELETE-class prohibition target) |
+
+## 13. Implementation reconciliation (filled by the W13 Worker — extend, never weaken)
+
+The implemented contract follows §§1–12 with the resolutions below. Every
+deviation from a §12 recommended default is honest and recorded; none weakens
+a Work Order criterion.
+
+### 13.1 Implemented surface (exactly the five allowed files)
+
+- `src/sos/selfevolution.py` (NEW): `SelfEvolutionContractError(ModelValidationError)`;
+  frozen constants `MAX_META_DEPTH = 3`, `FROZEN_AUTHORITY_PATHS`,
+  `FROZEN_AUTHORITY_PATH_PREFIXES` (the frozen Work Orders directory),
+  `AUTHORITY_MODULE_PATHS`, `SELF_EVOLUTION_TERMINAL_STATES`;
+  `ProposalOrigin`, `SourceChangeKind`, `SourceChange`,
+  `SelfImprovementHypothesis`, `SelfEvolutionState` + frozen transition table
+  + `validate_self_evolution_transition`, `SelfEvolutionGate`,
+  `PendingResolution`, `PendingProposalAuthorization`, `PendingProposalEvidence`,
+  `SelfEvolutionProposal` (content-addressed over the INTAKE material — stable
+  identity across the lifecycle, the W8 `Experiment` precedent; tamper-evident
+  id-integrity check in `validate`), `resolve_meta_chain`, `SelfEvolutionStep`
+  (table-validated at construction), `step_to_w4_evidence` (reuses the W4
+  package-internal `_build_evidence` — one content-addressing algorithm),
+  `SelfEvolutionTransitionResult`, `transition_self_evolution`,
+  `defer_self_evolution`. No engine class; the free-function surface is the
+  W8 `transition_experiment` precedent.
+- `src/sos/__init__.py`: W13 exports only (23 names); zero other changes.
+- `tests/test_w13_selfevolution.py` (NEW): 78 deterministic offline test items
+  in 42 test functions; the happy path runs the REAL W3 recovery + REAL W7
+  `assure_candidate` (over a W6 candidate projection carrying the proposal's
+  explicit id) + REAL W8 lifecycle/evaluation/`PromotionGate` + REAL W9
+  `evaluate_autonomy` before the lifecycle consumes the records; boundary
+  tests use directly-constructed W7/W8/W9 records (the W12 `assurance_record`
+  precedent).
+
+### 13.2 Design resolutions (Worker latitude, resolved)
+
+1. **Stable proposal identity.** The proposal id is content-addressed over
+   the intake material ONLY (revision, paths, changes, hypothesis, origin,
+   rollback ref, recursion fields, W6 citation, traceability); state, gate
+   references, pendings, adoption citation, and evidence ids are EXCLUDED —
+   so every governed transition returns a record with the SAME id and the
+   W7/W8/W9 chain bindings remain exact across the lifecycle. `validate`
+   re-derives the id (tamper-evident).
+2. **The W7/W9 engines are composed by the caller; the W8 promotion gate
+   engine is re-run by the core.** The lifecycle CONSUMES W7 `AssuranceResult`
+   and W9 `AutonomyDecision` records from the caller-supplied registries
+   (C4's exact mandate: "from caller-supplied `known_decisions`") and
+   chain-checks them (proposal id + target revision + decision chain). The
+   REAL W8 `PromotionGate().evaluate` is additionally RE-RUN inside
+   `transition_self_evolution` at both the UNDER_AUTHORITY entry and the
+   PROMOTED promotion point, so a supplied `PromotionDecision` can never
+   outrank the real authority. The real `assure_candidate` and
+   `evaluate_autonomy` engines are exercised end-to-end by the test suite
+   (the Work Order's "injected W7/W8/W9 records" evaluation model); the
+   module imports the record/status types it binds.
+3. **W6 citation seam.** `candidate_ref` cites a real W6 `CandidateProposal`
+   id (validated against `known_candidates`); W6's `SubgraphMutation` carries
+   no independent id of its own, so the candidate citation IS the
+   mutation citation (the cited candidate's mutation is thereby cited).
+4. **Rejection grounds, one gate per source state (deterministic, frozen):**
+   PROPOSED→REJECTED requires a W9 REJECT decision (empty chain);
+   UNDER_ASSURANCE→REJECTED requires a supplied W7 result with a resolved
+   NON-PASS status (distinct statuses preserved verbatim:
+   FAIL→FAILED, UNKNOWN→UNKNOWN, BLOCKED→UNAVAILABLE);
+   UNDER_EXPERIMENT→REJECTED requires the W8 gate decision (promoted=False,
+   cross-checked against the real PromotionGate re-run);
+   UNDER_AUTHORITY/PAUSED_ASKING→REJECTED requires a W9 REJECT decision.
+5. **Rollback grounds (frozen):** UNDER_EXPERIMENT→ROLLED_BACK requires the
+   W8 experiment lifecycle itself in `ROLLED_BACK` state (W8-governed
+   recovery) plus the bounded `RollbackPath` bound to the declared
+   `rollback_ref` with SUCCESS recovery evidence provenance-bound to the
+   target revision; UNDER_AUTHORITY/PROMOTED→ROLLED_BACK requires a resolved
+   W9 ROLLBACK decision plus the same recovery binding. `adoption_revision`
+   is preserved on PROMOTED→ROLLED_BACK as historical data.
+6. **Resume semantics.** PAUSED_ASKING→UNDER_AUTHORITY requires a NEW
+   resolved W9 ACT decision (the old ASK decision, a GATHER_EVIDENCE
+   decision, or no decision all refuse); the resumed record clears the pause
+   marker and carries the resuming decision id. The promotion transition
+   then requires its own supplied ACT decision as usual.
+7. **Evidence kinds.** Steps convert verbatim into W4 evidence:
+   ROLLED_BACK-targeting steps become `rollback`-kind evidence, every other
+   step an `observation`; only existing W4 kinds; availability is always
+   SUCCESS (the step was captured) while the observed outcome state is
+   preserved verbatim (pause/deferral steps are truthful UNKNOWN).
+8. **Deferral API.** Non-resolving W9 states (GATHER_EVIDENCE, EXPERIMENT) go
+   through `defer_self_evolution` (a state-KEEPING step: explicit
+   pending-evidence record, truthful UNKNOWN evidence, no advancement, no
+   refusal) — the state machine itself has no self-transitions.
+9. **Construction strictness (extends the prepared contract).** In addition
+   to the prepared rules: `target_paths` must be sorted/deduplicated and
+   exactly match the change paths; every change's `base_revision` must equal
+   the proposal's `target_revision`; the hypothesis must cite ≥1 trigger
+   evidence id and ≥1 predicted effect and may never claim SUCCESS
+   uncertainty; id-integrity is re-verified in `validate` (tamper-evident
+   records); the intake transition REFUSES citations that cannot be
+   validated (registry not supplied).
+10. **`AUTHORITY_MODULE_PATHS` extension.** The prepared §12 default named
+    the W1/W4/W5/W6/W7/W8/W9 authority modules; the implemented constant
+    additionally protects `src/sos/selfevolution.py` (the lifecycle machine's
+    own module) and `src/sos/__init__.py` (the package export boundary) from
+    DELETE-class changes — "no code path may remove or weaken the lifecycle
+    machine's own gate requirements". MODIFY-class changes on authority
+    modules remain lawful proposals (still fully gated); DELETE-class changes
+    on non-authority `src/sos` modules remain lawful proposals (still fully
+    gated, adoption still external).
+
+### 13.3 Honest deviations from the §12 recommended defaults
+
+- **Transition API shape:** implemented exactly as recommended (module-level
+  `transition_self_evolution(proposal, new_state, *, known_...)`); no engine
+  class was added.
+- **Error type / state names / `MAX_META_DEPTH` / adoption field / W4 binding
+  helper / origin members / frozen path set:** implemented exactly as
+  recommended (`MAX_META_DEPTH = 3`).
+- **Naming deviations (documented, no semantic change):** the pending records
+  are `PendingProposalAuthorization`/`PendingProposalEvidence` with a W13-owned
+  `PendingResolution` (PENDING-only) — W12's `PendingAuthorization`/
+  `AuthorizationResolution` are W12-owned and W13 must not depend on W12
+  internals; the step converter is `step_to_w4_evidence`; the promotion
+  reference is the W12-canonical `"<experiment-id>:<evaluation-id>"` string
+  stored in `promotion_id`.
+- **§3 field list extensions:** the implemented `SelfEvolutionProposal` also
+  carries `assurance_status` (the bound W7 status — W7 distinctness visible
+  on the record), `pending_evidence` (the deferral marker), and
+  `SELF_EVOLUTION_TERMINAL_STATES` is exported. Nothing was removed.
+
+## 14. Acceptance criteria → implementation → test mapping (C1–C12)
+
+| Criterion | Implementation anchor | Primary tests |
+|---|---|---|
+| C1 composed-authority integrity | import-identity reuse; chain-check helpers re-resolve every W7/W8/W9 reference; real `PromotionGate` re-run; `Experiment.validate(known_assurance=...)` delegated | `test_w13_references_frozen_authorities_without_redefining`, `test_full_governed_happy_path_produces_deterministic_promoted_record`, `test_missing_or_unresolved_w9_reference_is_rejected` |
+| C2 proposal-as-data integrity | inert `SourceChange` payload; exact `target_revision` citation; untrusted origin; W1 traceability; content-addressed id; `JsonModelStore` round-trip; no apply path (source scans) | `test_full_governed_happy_path_produces_deterministic_promoted_record`, `test_records_round_trip_through_w1_json_store`, `test_selfevolution_module_scan_is_clean` |
+| C3 W7→W8→W9 ordering | frozen table + state-dependent field presence + per-transition gate bindings | `test_lifecycle_state_machine_rejects_free_form_transitions`, `test_under_experiment_requires_w7_pass_bound_to_exact_chain`, `test_stage_skip_attempts_are_rejected_at_the_transition_boundary`, `test_promotion_requires_the_w8_promotion_gate_decision` |
+| C4 no self-authorization | `PROMOTED` only via a supplied resolved ACT decision; no authority minting anywhere; PENDING-only pending records | `test_missing_or_unresolved_w9_reference_is_rejected`, `test_pending_authorization_can_never_auto_approve`, `test_evaluation_surface_exposes_no_proposal_generation_path` |
+| C5 ASK pause mechanics | `PAUSED_ASKING` + `PendingProposalAuthorization`; resume only via a NEW ACT decision; `defer_self_evolution` for GATHER_EVIDENCE/EXPERIMENT | `test_w9_ask_pauses_with_explicit_pending_authorization_record`, `test_ask_pause_leaves_only_via_a_new_resolved_act_decision`, `test_w9_gather_evidence_defers_with_explicit_pending_record`, `test_w9_experiment_decision_defers_and_deferral_is_gated`, `test_deferral_while_paused_keeps_the_pause_state` |
+| C6 Constitution/authority protection | `FROZEN_AUTHORITY_PATHS`/`PREFIXES` + `AUTHORITY_MODULE_PATHS` enforced at BOTH `SourceChange` and proposal construction; gate logic frozen code | `test_frozen_authority_target_paths_are_rejected_at_intake`, `test_delete_on_authority_implementation_modules_is_rejected_at_intake`, `test_non_authority_delete_and_authority_modify_remain_lawful_proposals` |
+| C7 governed promotion/rollback | bounded `RollbackPath` bound to `rollback_ref` with SUCCESS provenance-bound recovery evidence at BOTH the UNDER_AUTHORITY and PROMOTED transitions; W8/W9-governed rollback paths | `test_promotion_requires_a_bounded_rollback_path_bound_to_the_declared_reference`, `test_w9_rollback_from_authority_rolls_back_with_recovery_evidence`, `test_promoted_record_rolls_back_through_governed_recovery`, `test_w8_experiment_rollback_from_under_experiment_requires_governed_recovery` |
+| C8 truth preservation | injective W7-status→truth map; verbatim `TruthfulValue` outcomes into W4 evidence; predictions/payloads never ingested | `test_rejection_on_resolved_non_pass_w7_preserves_distinctions` (×3), `test_truth_distinctions_are_preserved_through_the_lifecycle`, `test_predictions_and_payloads_are_never_ingested_as_evidence` |
+| C9 origin never authorizes | origin is identity material only; no gate reads it (structural + behavioral proofs) | `test_origin_never_authorizes_identical_gates_for_every_origin`, `test_no_gate_reads_the_proposal_origin` |
+| C10 bounded recursion | `MAX_META_DEPTH=3`; construction + `resolve_meta_chain` checks; no generation path; one call one proposal | `test_recursion_depth_overflow_is_rejected`, `test_ancestor_chain_must_resolve_completely_from_known_proposals`, `test_evaluation_surface_exposes_no_proposal_generation_path` |
+| C11 determinism and bounds | clock-free core; caller-supplied timestamps; sha256 content addressing; byte-identical re-runs; token scans | `test_identical_runs_produce_byte_identical_records_and_ids`, `test_no_self_modification_execution_tokens_anywhere_in_src`, `test_selfevolution_module_scan_is_clean` |
+| C12 persistence and bounded surface | W1 `JsonModelStore` round-trip; exports only through `sos`; no W14 symbols | `test_records_round_trip_through_w1_json_store`, `test_w13_exports_only_through_the_package_surface`, `test_no_w14_or_successor_symbols` |
+
+## 15. Required regression coverage mapping (Work Order list → tests, one-to-one)
+
+| Work Order required scenario | Test(s) |
+|---|---|
+| full governed happy path (…→PROMOTED, evidence every step, deterministic, byte-identical re-run) | `test_full_governed_happy_path_produces_deterministic_promoted_record`, `test_identical_runs_produce_byte_identical_records_and_ids` |
+| W9 ASK pause + resume only via new resolved decision | `test_w9_ask_pauses_with_explicit_pending_authorization_record`, `test_ask_pause_leaves_only_via_a_new_resolved_act_decision` |
+| W9 GATHER_EVIDENCE deferral | `test_w9_gather_evidence_defers_with_explicit_pending_record` (+ `test_deferral_while_paused_keeps_the_pause_state`) |
+| W9 REJECT refusal | `test_w9_reject_refuses_the_proposal` |
+| W9 ROLLBACK with recovery evidence | `test_w9_rollback_from_authority_rolls_back_with_recovery_evidence`, `test_promoted_record_rolls_back_through_governed_recovery`, `test_w8_experiment_rollback_from_under_experiment_requires_governed_recovery` |
+| missing/unresolved W9 reference rejection | `test_missing_or_unresolved_w9_reference_is_rejected` |
+| W7-missing / W7 non-PASS stage-advance rejection | `test_under_experiment_requires_w7_pass_bound_to_exact_chain` (×3 statuses + missing/chain-mismatch/non-record) |
+| promotion without PromotionGate/PromotionDecision rejection | `test_promotion_requires_the_w8_promotion_gate_decision` (missing/unknown/refused/forged-vs-real-gate), `test_rejection_at_the_experiment_stage_records_the_refused_gate` |
+| promotion without bounded RollbackPath rejection | `test_promotion_requires_a_bounded_rollback_path_bound_to_the_declared_reference` (none/wrong-ref/missing-ev/failed-ev/wrong-revision) |
+| stage-skip attempts rejected | `test_lifecycle_state_machine_rejects_free_form_transitions` (exhaustive), `test_stage_skip_attempts_are_rejected_at_the_transition_boundary` (×9) |
+| intake rejection of frozen-authority target paths | `test_frozen_authority_target_paths_are_rejected_at_intake` (×12, incl. the work-orders prefix) |
+| intake rejection of DELETE on authority-implementation modules | `test_delete_on_authority_implementation_modules_is_rejected_at_intake` (×9) |
+| recursion-depth overflow rejection | `test_recursion_depth_overflow_is_rejected`, `test_ancestor_chain_must_resolve_completely_from_known_proposals` |
+| origin irrelevance | `test_origin_never_authorizes_identical_gates_for_every_origin`, `test_no_gate_reads_the_proposal_origin` |
+| truth preservation through the lifecycle | `test_truth_distinctions_are_preserved_through_the_lifecycle`, `test_rejection_on_resolved_non_pass_w7_preserves_distinctions` (×3), `test_predictions_and_payloads_are_never_ingested_as_evidence` |
+| W5/W6 citation validation | `test_w5_w6_citations_are_validated_against_caller_supplied_registries` (incl. the W5 `ArchitectureMemory` prior seam) |
+| determinism (identical runs → identical ids) | `test_identical_runs_produce_byte_identical_records_and_ids`, `test_full_governed_happy_path_produces_deterministic_promoted_record` |
+| JSON round-trip through W1 `JsonModelStore` | `test_records_round_trip_through_w1_json_store` (proposal, step, pending, paused) |
+| source scan for self-modification execution tokens | `test_no_self_modification_execution_tokens_anywhere_in_src`, `test_selfevolution_module_scan_is_clean` |
+| absence of W14 symbols | `test_no_w14_or_successor_symbols` |
+| absence of proposal-generation methods on the evaluation surface | `test_evaluation_surface_exposes_no_proposal_generation_path` |
+| authority-symbol identity assertions | `test_w13_references_frozen_authorities_without_redefining`, `test_w13_exports_only_through_the_package_surface` |
