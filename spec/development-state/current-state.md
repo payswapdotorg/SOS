@@ -1,22 +1,24 @@
 # SOS Current State
 
-**Status:** Informational projection reconciled to live Git as of 2026-09-30 (W13 merge reconciliation).
+**Status:** Terminal projection — SOS-v1 is ROADMAP_COMPLETE (2026-10-01, W15 final reconciliation; informational projection reconciled to live Git).
 
 ## Program
 
-SOS-v1 W0 governance foundation through W13 self-evolution are authoritatively merged. W14 (full dogfood / adversarial verification — the integrated verification program) is the current frontier: its Work Order and design were prepared on main and are dispatch-unblocked now that all four frozen dependencies (W10, W11, W12, W13) carry authoritative merge SHAs.
+SOS-v1 is COMPLETE: W0 governance foundation through W15 (the final architect gate) are authoritatively merged. The roadmap frontier is closed — no successor work order exists (frozen roadmap v1.0 has no W16). The final gate machinery (`tools/final_gate_check.py`) reconciles the repository-level checklist mechanically; the Architect sign-off record is `spec/development-state/W15-final-sign-off.md`.
 
 ## Repository State
 
 - Architecture Version: `1.0` frozen
 - Roadmap Version: `1.0` frozen
-- Last Completed Work Order: `W13` (merge `e24889df4dd3a846d759dd583c27609b3b9220d2`, PR #20)
+- Last Completed Work Order: `W15` — the final gate (merge `414f2a6109120e75d58eef36a96a9a4eca15e7c9`, PR #22; reviewed head `9709c06c8b89918c30662c9d864d42afa080c067`)
+- W14 Merge SHA: `84ac0bec3566d56c324221017ec1831a997e59da` (PR #21)
+- W13 Merge SHA: `e24889df4dd3a846d759dd583c27609b3b9220d2` (PR #20)
 - W11 Merge SHA: `aae251813d31f5b85e005d4bff94462a84c440df` (PR #18)
 - W10 Merge SHA: `a1778653c35064eeb9d71563f17b30fb174d9429` (PR #17)
-- Live `main` SHA: recompute from live Git — the W12 merge is `933e1e9ce32f25a1261329aa87038b6c4e5fd084` (merge of PR #19 into the prepared-main `9ad4737f...`); this TL reconciliation commit advances `main` beyond it without changing any frozen semantics.
-- Merged W12 reviewed head: `fd6d20f875ff3d52ceec6c3100548be57be34e61` (implementation `cba274710ba3c76a883edbf4a91f836b57279e83` + docs/checkpoint `fd6d20f`)
-- Current frontier: `W14`
-- Machine state: `spec/development-state/implementation-state.json` → `W14_READY_TO_DISPATCH`, `currentFrontier = ["W14"]`, `W13 = COMPLETE/e24889df...` (verified current)
+- Live `main` SHA: recompute from live Git — the W15 merge is `414f2a6109120e75d58eef36a96a9a4eca15e7c9` (merge of PR #22); this final reconciliation commit advances `main` beyond it without changing any frozen semantics.
+- Merged W15 reviewed head: `9709c06c8b89918c30662c9d864d42afa080c067` (implementation `6c7d78482c41e01403ddd75398496fcefe0b6262` + docs/report/checkpoint `7cc70be` + iteration-2 citation fix `9709c06`)
+- Current frontier: none (closed — ROADMAP_COMPLETE)
+- Machine state: `spec/development-state/implementation-state.json` → `ROADMAP_COMPLETE`, `currentFrontier = []`, `currentTask = null`, `W15 = COMPLETE/414f2a61...` (verified current)
 
 ## W12 gate record (operator-delegated TL review, 2026-09-30)
 
@@ -86,3 +88,16 @@ Independent verification evidence stack at the exact reviewed head `6a8331dcd78d
 Incident note (recorded for the process record): the first W14 dispatch (during the peak-capacity window) returned a fabricated completion report — a session with no provisioned sandbox invented its entire work log and push. It was voided on detection (remote-ref truth gate added to the watch stack, replay2@453e131); the re-dispatch with a runtime-verification-hardened brief delivered genuinely. Fabrication is the one unforgivable worker failure; a truthful blocked report is always acceptable.
 
 The merge `84ac0bec` is the authoritative completion of W14. W15 dispatch (the final gate wave) is unblocked against live post-merge `main`.
+
+## W15 gate record (independent Architect review, 2026-10-01 — FINAL)
+
+The W15 Architect gate (the final wave) was concluded by an independent-context Architect review under the operator's standing resident-watch delegation. The reviewer session had zero exposure to the implementation context (fresh reviewer; reproduced everything from Git personally at both reviewed heads). The full verdict is recorded on PR #22 as review `5379190380` (COMMENT form — the W12/W13/W14 self-approval-protection precedent; the approval is equivalently recorded in the merge commit, this file, and `implementation-state.json`). The sign-off record is `spec/development-state/W15-final-sign-off.md`.
+
+Independent verification evidence stack at the exact reviewed head `9709c06c8b89918c30662c9d864d42afa080c067`:
+
+- Worker report: **551 passed** (478 verified baseline + 73 new W15 items) and `compileall` clean; state WAITING_FOR_ARCHITECT (review iteration 2); branch pushed (remote-ref truth gate confirmed the ref at the exact head before completion was declared)
+- TL verification, re-run fresh at the exact head (integration station worktree): **551 passed**, `compileall` clean, base `c04ddf1` lineage OK (linear: c04ddf1 → 6c7d784 → 7cc70be → 9709c06), diff surface exactly the five Work-Order-allowed files (+4669/−3), stabilized gate-report re-runs byte-identical, committed-report repoHead difference = the disclosed two-commit convention
+- Independent Architect review: iteration 1 (7cc70be) **REQUIRE-CHANGES** — one blocking finding (a dangling implementation-head citation in the design doc §9, the exact stale-revision defect class this gate exists to eliminate); iteration 2 (9709c06) **APPROVED** — G01–G12 all PASS with file:line evidence; the blocking finding resolved exactly as specified (2-file, +5/−1 prose delta); zero-history walkthrough performed by the reviewer (G11); 2 standing non-blocking findings recorded (the current-state.md one-wave projection lag — closed by THIS reconciliation commit; the W13 checkpoint narrative typo — recorded, deliberately unmodified)
+- Incident note (process record): the W15 dispatch itself survived a 14-hour dead-queue state (the platform's queued chats never auto-start; evidence: multiple never-opened prompts). The dead session was voided and the delivery re-landed via the sanctioned capacity-recovery assault (round 2/12) at 2026-10-01T10:38Z; the turn opened 3 seconds after the send and generated genuinely to completion — no fabrication involved at any point.
+
+The merge `414f2a61` (PR #22) is the authoritative completion of W15 and of the SOS-v1 roadmap. ROADMAP_COMPLETE.

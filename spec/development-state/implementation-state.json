@@ -1,157 +1,156 @@
 {
- "schemaVersion": "1.0",
- "program": "SOS-v1",
- "roadmap": "spec/implementation-roadmap.md",
- "status": "W15_READY_TO_DISPATCH",
- "tasks": {
-  "W0": {
-   "status": "BOOTSTRAP_COMPLETE",
-   "dependencies": [],
-   "mergedAs": null,
-   "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"
+  "schemaVersion": "1.0",
+  "program": "SOS-v1",
+  "roadmap": "spec/implementation-roadmap.md",
+  "status": "ROADMAP_COMPLETE",
+  "tasks": {
+    "W0": {
+      "status": "BOOTSTRAP_COMPLETE",
+      "dependencies": [],
+      "mergedAs": null,
+      "bootstrapCommit": "8158bc441025e6e815999deb965dd4b7adf989ac"
+    },
+    "W1": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W0"
+      ],
+      "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"
+    },
+    "W2": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W1"
+      ],
+      "mergedAs": "587201d3e12a10ba9fac6da751d663a40c33dfb9"
+    },
+    "W3": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W2"
+      ],
+      "mergedAs": "6541441bb706ef1f27b2c38b9eb930433641b14b"
+    },
+    "W4": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W2"
+      ],
+      "mergedAs": "26060db57c24ba8b36315c1005466046810c5163"
+    },
+    "W5": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W4"
+      ],
+      "mergedAs": "2bfd0f89da129c6b3347d88b0d8da1b79dd04127"
+    },
+    "W6": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W3",
+        "W5"
+      ],
+      "mergedAs": "b5171f70ca5ce85ca0be07cfdb3abf034c03c32f"
+    },
+    "W7": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W6"
+      ],
+      "mergedAs": "25f663cf444f92b3190074a9119619cbc53e9ece"
+    },
+    "W8": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W7"
+      ],
+      "mergedAs": "65b84058aa204b3749e45b7e21ae433a4b138d83"
+    },
+    "W9": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W7",
+        "W8"
+      ],
+      "mergedAs": "203cfb7590bd25244cabf3cc7299dd192b00948d"
+    },
+    "W10": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W2",
+        "W9"
+      ],
+      "mergedAs": "a1778653c35064eeb9d71563f17b30fb174d9429"
+    },
+    "W11": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W1",
+        "W2",
+        "W9"
+      ],
+      "mergedAs": "aae251813d31f5b85e005d4bff94462a84c440df"
+    },
+    "W12": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W3",
+        "W4",
+        "W5",
+        "W6",
+        "W7",
+        "W8",
+        "W9"
+      ],
+      "mergedAs": "933e1e9ce32f25a1261329aa87038b6c4e5fd084"
+    },
+    "W13": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W8",
+        "W9"
+      ],
+      "mergedAs": "e24889df4dd3a846d759dd583c27609b3b9220d2"
+    },
+    "W14": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W10",
+        "W11",
+        "W12",
+        "W13"
+      ],
+      "mergedAs": "84ac0bec3566d56c324221017ec1831a997e59da"
+    },
+    "W15": {
+      "status": "COMPLETE",
+      "dependencies": [
+        "W14"
+      ],
+      "mergedAs": "414f2a6109120e75d58eef36a96a9a4eca15e7c9"
+    }
   },
-  "W1": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W0"
-   ],
-   "mergedAs": "091d4d10a38922fb2d9cadb103e7ba8caa7a1f20"
-  },
-  "W2": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W1"
-   ],
-   "mergedAs": "587201d3e12a10ba9fac6da751d663a40c33dfb9"
-  },
-  "W3": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W2"
-   ],
-   "mergedAs": "6541441bb706ef1f27b2c38b9eb930433641b14b"
-  },
-  "W4": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W2"
-   ],
-   "mergedAs": "26060db57c24ba8b36315c1005466046810c5163"
-  },
-  "W5": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W4"
-   ],
-   "mergedAs": "2bfd0f89da129c6b3347d88b0d8da1b79dd04127"
-  },
-  "W6": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W3",
-    "W5"
-   ],
-   "mergedAs": "b5171f70ca5ce85ca0be07cfdb3abf034c03c32f"
-  },
-  "W7": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W6"
-   ],
-   "mergedAs": "25f663cf444f92b3190074a9119619cbc53e9ece"
-  },
-  "W8": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W7"
-   ],
-   "mergedAs": "65b84058aa204b3749e45b7e21ae433a4b138d83"
-  },
-  "W9": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W7",
-    "W8"
-   ],
-   "mergedAs": "203cfb7590bd25244cabf3cc7299dd192b00948d"
-  },
-  "W10": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W2",
-    "W9"
-   ],
-   "mergedAs": "a1778653c35064eeb9d71563f17b30fb174d9429"
-  },
-  "W11": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W1",
-    "W2",
-    "W9"
-   ],
-   "mergedAs": "aae251813d31f5b85e005d4bff94462a84c440df"
-  },
-  "W12": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W3",
-    "W4",
-    "W5",
-    "W6",
-    "W7",
-    "W8",
-    "W9"
-   ],
-   "mergedAs": "933e1e9ce32f25a1261329aa87038b6c4e5fd084"
-  },
-  "W13": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W8",
-    "W9"
-   ],
-   "mergedAs": "e24889df4dd3a846d759dd583c27609b3b9220d2"
-  },
-  "W14": {
-   "status": "COMPLETE",
-   "dependencies": [
-    "W10",
-    "W11",
-    "W12",
-    "W13"
-   ],
-   "mergedAs": "84ac0bec3566d56c324221017ec1831a997e59da"
-  },
-  "W15": {
-   "status": "READY",
-   "dependencies": [
-    "W14"
-   ],
-   "mergedAs": null
-  }
- },
- "currentFrontier": [
-  "W15"
- ],
- "currentTask": "W15",
- "notes": [
-  "W8 is authoritatively merged as 65b84058aa204b3749e45b7e21ae433a4b138d83 after exact-head Architect review and successful exact-head CI run #157.",
-  "W9 is authoritatively merged as 203cfb7590bd25244cabf3cc7299dd192b00948d from exact reviewed Worker head e85b4168837820761c74c8084215296e4ae192de; exact-head CI run #171 succeeded.",
-  "W10 is dispatched by spec/work-orders/W10-personalization-platform.md after authoritative W2 and W9 merge verification.",
-  "W10 is authoritatively merged as a1778653c35064eeb9d71563f17b30fb174d9429 (merge of PR #17, exact reviewed head c28f01e51c58ede8737e11931152f31d38dee552, exact-head CI green) after operator-delegated TL self-approval of the W10 gate packet (evidence: W10-GATE-SELF-APPROVAL, replay evidence dir).",
-  "W11 is dispatched by spec/work-orders/W11-execution-substrate.md against live post-merge main a1778653c35064eeb9d71563f17b30fb174d9429; it is the first bounded slice of greenfield realization (provider-neutral execution substrate per the PREP-W11 verified contract).",
-  "W11 is authoritatively merged as aae251813d31f5b85e005d4bff94462a84c440df (merge of PR #18, exact reviewed head 7cca0266444bfd9809dcd4549d1be4bdaad282bd, exact-head CI green, 327 passed) after operator-delegated TL self-approval (evidence: W11-GATE-SELF-APPROVAL, replay evidence dir). The substrate-level greenfield realization mechanism is complete; deeper onboarding slices may be ordered by the operator/Architect.",
-  "W12 is dispatched by spec/work-orders/W12-optimization-loop.md against live post-merge main aae251813d31f5b85e005d4bff94462a84c440df (first bounded slice: the governed brownfield optimization loop orchestrator composing the merged W3/W4/W5/W6/W7/W8/W9/W11 authorities).",
-  "W13/W14/W15 preparation packages (work orders, designs, W13 checkpoint template) are committed on main below the W12 merge and are now dispatch-unblocked; W13 is READY and is the current frontier.",
-  "All later status must be reconciled from actual Git merge evidence.",
-  "Never treat this file's projections as stronger than Git history or frozen architecture.",
-  "W12 is authoritatively merged as 933e1e9ce32f25a1261329aa87038b6c4e5fd084 (merge of PR #19, exact reviewed head fd6d20f875ff3d52ceec6c3100548be57be34e61). Gate: operator-delegated TL review under explicit operator chat instruction 2026-09-30 ('You review and decide what to do for W12'); review packet recorded as PR #19 review 5361283423 (COMMENT form: GitHub self-approval protection rejected the formal APPROVE event because PR author and reviewing PAT share the org account). Exact-head verification re-run fresh by the reviewer: pytest 360 passed (327 baseline re-verified + 33 W12), compileall clean, CI runs 200/201 success, five-file surface verified, merge-tree conflict-free.",
-  "W12 non-blocking findings recorded for later governed slices: W12-NB1 lifecycle-FAILED vs truth-axis preservation (C7 holds via verbatim W4 evidence); W12-NB2 candidate id-order is processing order, not value ranking; W12-NB3 OptimizationRun.validate could re-assert promotion.experiment_id == iteration.experiment_id directly at the run boundary (sanctioned constructor apply_promotion already enforces it).",
-  "For W13/W14/W15 the intended discipline is a strict independent Architect gate (an independent reviewer session, not the implementing/verifying TL) unless the operator explicitly delegates again; any such delegation must be recorded as governance debt, as done for W10/W11/W12.",
-  "W13 is dispatched by spec/work-orders/W13-self-evolution.md against live post-W12-merge main 0da1ca0 (first bounded slice: the governed self-evolution PROPOSAL lifecycle composing the merged W7/W8/W9/W4/W5/W6/W1 authorities).",
-  "W13 is authoritatively merged as e24889df4dd3a846d759dd583c27609b3b9220d2 (merge of PR #20, exact reviewed head 62855f95b55c54292ace61b66dcf29d7fa821793). Gate: independent-context Architect review APPROVED 2026-09-30 under the operator's standing resident-watch delegation (continuous monitor->harvest->review->approve->dispatch loop; independent reviewer session with zero exposure to the implementation context); verdict recorded as PR #20 review 5361283423->5368791106 (COMMENT form: GitHub self-approval protection rejects the formal APPROVE event because the PR author and reviewing PAT share the org account, W12 precedent). Cross-evidence: worker report 438 passed + compileall clean; TL exact-head verification reproduced fresh (438 passed in 1.42s, compileall clean, five-file surface, base lineage); GitHub Actions CI success at the exact head (run 36731172770); an independent platform Architect session (w13arch) was also dispatched and its confirmation verdict, when it lands, is to be appended to the gate record as supplementary evidence.",
-  "W13 non-blocking findings recorded for later governed slices: W13-NB1 checkpoint states __init__.py +26 lines but the actual diff is +25 (cosmetic; design doc records +25 correctly); W13-NB2 no fired-StopCondition scenario is directly exercised in the W13 suite (offsetting is enforced by the real PromotionGate re-run at selfevolution.py:1716/:1784); W13-NB3 deferral-while-paused replaces the pending_evidence marker with the latest deferral (prior markers remain cited in the evidence chain; documented in design section 13.2).",
-  "W14 is authoritatively merged as 84ac0bec3566d56c324221017ec1831a997e59da after exact-head independent Architect review (APPROVED, C1-C10 PASS, review 5371303791 on PR #21), TL verification (478 passed fresh at 6a8331d), and CI run 36762268973 success at the exact head."
- ]
+  "currentFrontier": [],
+  "currentTask": null,
+  "notes": [
+    "W8 is authoritatively merged as 65b84058aa204b3749e45b7e21ae433a4b138d83 after exact-head Architect review and successful exact-head CI run #157.",
+    "W9 is authoritatively merged as 203cfb7590bd25244cabf3cc7299dd192b00948d from exact reviewed Worker head e85b4168837820761c74c8084215296e4ae192de; exact-head CI run #171 succeeded.",
+    "W10 is dispatched by spec/work-orders/W10-personalization-platform.md after authoritative W2 and W9 merge verification.",
+    "W10 is authoritatively merged as a1778653c35064eeb9d71563f17b30fb174d9429 (merge of PR #17, exact reviewed head c28f01e51c58ede8737e11931152f31d38dee552, exact-head CI green) after operator-delegated TL self-approval of the W10 gate packet (evidence: W10-GATE-SELF-APPROVAL, replay evidence dir).",
+    "W11 is dispatched by spec/work-orders/W11-execution-substrate.md against live post-merge main a1778653c35064eeb9d71563f17b30fb174d9429; it is the first bounded slice of greenfield realization (provider-neutral execution substrate per the PREP-W11 verified contract).",
+    "W11 is authoritatively merged as aae251813d31f5b85e005d4bff94462a84c440df (merge of PR #18, exact reviewed head 7cca0266444bfd9809dcd4549d1be4bdaad282bd, exact-head CI green, 327 passed) after operator-delegated TL self-approval (evidence: W11-GATE-SELF-APPROVAL, replay evidence dir). The substrate-level greenfield realization mechanism is complete; deeper onboarding slices may be ordered by the operator/Architect.",
+    "W12 is dispatched by spec/work-orders/W12-optimization-loop.md against live post-merge main aae251813d31f5b85e005d4bff94462a84c440df (first bounded slice: the governed brownfield optimization loop orchestrator composing the merged W3/W4/W5/W6/W7/W8/W9/W11 authorities).",
+    "W13/W14/W15 preparation packages (work orders, designs, W13 checkpoint template) are committed on main below the W12 merge and are now dispatch-unblocked; W13 is READY and is the current frontier.",
+    "All later status must be reconciled from actual Git merge evidence.",
+    "Never treat this file's projections as stronger than Git history or frozen architecture.",
+    "W12 is authoritatively merged as 933e1e9ce32f25a1261329aa87038b6c4e5fd084 (merge of PR #19, exact reviewed head fd6d20f875ff3d52ceec6c3100548be57be34e61). Gate: operator-delegated TL review under explicit operator chat instruction 2026-09-30 ('You review and decide what to do for W12'); review packet recorded as PR #19 review 5361283423 (COMMENT form: GitHub self-approval protection rejected the formal APPROVE event because PR author and reviewing PAT share the org account). Exact-head verification re-run fresh by the reviewer: pytest 360 passed (327 baseline re-verified + 33 W12), compileall clean, CI runs 200/201 success, five-file surface verified, merge-tree conflict-free.",
+    "W12 non-blocking findings recorded for later governed slices: W12-NB1 lifecycle-FAILED vs truth-axis preservation (C7 holds via verbatim W4 evidence); W12-NB2 candidate id-order is processing order, not value ranking; W12-NB3 OptimizationRun.validate could re-assert promotion.experiment_id == iteration.experiment_id directly at the run boundary (sanctioned constructor apply_promotion already enforces it).",
+    "For W13/W14/W15 the intended discipline is a strict independent Architect gate (an independent reviewer session, not the implementing/verifying TL) unless the operator explicitly delegates again; any such delegation must be recorded as governance debt, as done for W10/W11/W12.",
+    "W13 is dispatched by spec/work-orders/W13-self-evolution.md against live post-W12-merge main 0da1ca0 (first bounded slice: the governed self-evolution PROPOSAL lifecycle composing the merged W7/W8/W9/W4/W5/W6/W1 authorities).",
+    "W13 is authoritatively merged as e24889df4dd3a846d759dd583c27609b3b9220d2 (merge of PR #20, exact reviewed head 62855f95b55c54292ace61b66dcf29d7fa821793). Gate: independent-context Architect review APPROVED 2026-09-30 under the operator's standing resident-watch delegation (continuous monitor->harvest->review->approve->dispatch loop; independent reviewer session with zero exposure to the implementation context); verdict recorded as PR #20 review 5361283423->5368791106 (COMMENT form: GitHub self-approval protection rejects the formal APPROVE event because the PR author and reviewing PAT share the org account, W12 precedent). Cross-evidence: worker report 438 passed + compileall clean; TL exact-head verification reproduced fresh (438 passed in 1.42s, compileall clean, five-file surface, base lineage); GitHub Actions CI success at the exact head (run 36731172770); an independent platform Architect session (w13arch) was also dispatched and its confirmation verdict, when it lands, is to be appended to the gate record as supplementary evidence.",
+    "W13 non-blocking findings recorded for later governed slices: W13-NB1 checkpoint states __init__.py +26 lines but the actual diff is +25 (cosmetic; design doc records +25 correctly); W13-NB2 no fired-StopCondition scenario is directly exercised in the W13 suite (offsetting is enforced by the real PromotionGate re-run at selfevolution.py:1716/:1784); W13-NB3 deferral-while-paused replaces the pending_evidence marker with the latest deferral (prior markers remain cited in the evidence chain; documented in design section 13.2).",
+    "W14 is authoritatively merged as 84ac0bec3566d56c324221017ec1831a997e59da after exact-head independent Architect review (APPROVED, C1-C10 PASS, review 5371303791 on PR #21), TL verification (478 passed fresh at 6a8331d), and CI run 36762268973 success at the exact head.",
+    "W15 (the final architect gate) is authoritatively merged as 414f2a6109120e75d58eef36a96a9a4eca15e7c9 (merge of PR #22, exact reviewed head 9709c06c8b89918c30662c9d864d42afa080c067) after exact-head independent Architect review (APPROVED, G01-G12 all PASS with file:line evidence, review 5379190380; REQUIRE-CHANGES iteration 1 resolved in 9709c06). Program terminal state: ROADMAP_COMPLETE, frontier closed, no successor exists. Final gate evidence: 551 passed (478 baseline + 73 W15), compileall CLEAN, tools/final_gate_check.py 12/12 PASS at the reviewed head; sign-off record spec/development-state/W15-final-sign-off.md."
+  ]
 }
