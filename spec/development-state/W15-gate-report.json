@@ -1,0 +1,100 @@
+{
+  "schema": "sos-w15-gate-report/1.0",
+  "repoHead": "6c7d78482c41e01403ddd75398496fcefe0b6262",
+  "commands": {
+    "pytest": {
+      "exitCode": 0,
+      "passed": 551
+    },
+    "compileall": {
+      "exitCode": 0
+    }
+  },
+  "checks": [
+    {
+      "id": "G01",
+      "title": "FROZEN_AUTHORITY_INTEGRITY",
+      "area": "architecture",
+      "status": "PASS",
+      "details": "5/5 frozen authority documents byte-identical to the dispatch-time gate baseline (Architect-verified against frozen v1.0 at review)"
+    },
+    {
+      "id": "G02",
+      "title": "MODULE_SURFACE_CONFORMANCE",
+      "area": "architecture",
+      "status": "PASS",
+      "details": "src/sos contains exactly the baseline per-wave module surface (14 modules + __init__.py; W1:model.py, W2:graph.py, W3:recovery.py, W4:evidence.py, W5:causal.py, W6:candidates.py, W7:assurance.py, W8:experimentation.py, W9:autonomy.py, W10:personalization.py+platform.py, W11:execution.py, W12:optimization.py, W13:selfevolution.py, W14:none, W15:none) — no fifth authority, no unmapped subsystem, none missing"
+    },
+    {
+      "id": "G03",
+      "title": "REQUIREMENTS_COVERED",
+      "area": "requirements",
+      "status": "PASS",
+      "details": "all 24 requirements R1–R24 appear in at least one Work Order's primary-requirements line and in the W14 verification mapping; the implementation-state task set equals the frozen roadmap ledger set (['W0', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12', 'W13', 'W14', 'W15']); every roadmap ledger row W0–W14 has a COMPLETE task with a merge (W0 via the recorded bootstrapCommit exception)"
+    },
+    {
+      "id": "G04",
+      "title": "STATE_VS_GIT",
+      "area": "implementation state",
+      "status": "PASS",
+      "details": "14 COMPLETE task merges resolve, are reachable from HEAD and pairwise unique; every checkpoint-recorded implementation head is ancestral-or-equal to its wave's merge; recorded §2 squash-era PR-head exemption(s): 'Review head SHA:' cites the PR head 79d4ddb2 under ARCHITECT-REVIEW-PROTOCOL §2 (squash-era single-parent merge 091d4d10); resolvable, topology-verified, recorded; W0 bootstrapCommit exception honored; coverage direction (every wave W1–W15 has Work Order + checkpoint + design doc; task-set equality) is enforced by G08/G10/G03 and cited here per design G04"
+    },
+    {
+      "id": "G05",
+      "title": "DEPENDENCY_ANCESTRY",
+      "area": "dependency ancestry",
+      "status": "PASS",
+      "details": "all 30 declared dependency edges are real Git ancestry relations (the frozen sequencing rule mechanically proven); every W0–W14 merge is ancestral to the W15 reviewed head"
+    },
+    {
+      "id": "G06",
+      "title": "SUITE_GREEN",
+      "area": "tests",
+      "status": "PASS",
+      "details": "python -m pytest: exit 0, 551 passed (>= W14 checkpoint recorded count 478); python -m compileall -q src tests: exit 0 — exact-head counts recorded in the report; the Worker also runs both commands manually for the checkpoint (exact-head discipline)"
+    },
+    {
+      "id": "G07",
+      "title": "ADVERSARIAL_EVIDENCE",
+      "area": "adversarial evidence",
+      "status": "PASS",
+      "details": "matrix parses with schema sos-w14-adversarial-evidence-matrix/1.0; 16 rows contain each of the 16 frozen case names at least once; every verdict PASS; repoHead 02c12d45 is an ancestor of HEAD"
+    },
+    {
+      "id": "G08",
+      "title": "CHECKPOINTS_CURRENT",
+      "area": "exact revisions",
+      "status": "PASS",
+      "details": "15/15 checkpoints (W1–W15) exist and record exact base/head revisions; every base SHA resolves and is reachable from HEAD; 31 head/base claims resolve and are ancestor-or-equal of HEAD (no stale-head completion claim survives); §2 squash-era PR-head exemption(s): 'Review head SHA:' cites the PR head 79d4ddb2 under ARCHITECT-REVIEW-PROTOCOL §2 (squash-era single-parent merge 091d4d10); resolvable, topology-verified, recorded | W13: non-head narrative citation e3a97b895ca6f6cc7206a50bde45b2b55c554195 does not resolve (outside the head-claim semantics; recorded as an observation for the Architect)"
+    },
+    {
+      "id": "G09",
+      "title": "ROLLBACK_SAFETY",
+      "area": "rollback safety",
+      "status": "PASS",
+      "details": "every wave W1–W15 carries its rollback declaration in the baseline-recorded carrier (15 declarations: W1:scope-exclusion, W2:scope-exclusion, W3:section, W4:section, W5:section, W6:section, W7:section, W8:section, W9:section, W10:section, W11:section, W12:section, W13:section, W14:section, W15:section); no deployment/migration/network artifact exists anywhere in the repository tree; combined with G02 (exactly the frozen module surface) and G06 (suite green, including every wave's rollback-invariant tests) each merged authority is revertable by ordinary Git with no unrevertable external state"
+    },
+    {
+      "id": "G10",
+      "title": "DOCS_RECONCILED",
+      "area": "documentation",
+      "status": "PASS",
+      "details": "every wave W1–W15 has its Work Order and design doc (15+15 baseline filenames present); current-state.md projection: live-main line follows the recorded recompute convention with 1 ancestral milestone SHA(s); OBSERVED (recorded, non-blocking): projection lags ledger by one wave (last-completed W13 vs W14) — tolerated under the open-program merge-reconciliation boundary; the final reconciliation commit closes it (Work Order Risk section); REVIEW-TIME FLAG for the Architect | projection frontier W14 lags the ledger frontier W15 by one wave — tolerated under the open-program boundary; the final reconciliation commit closes it; REVIEW-TIME FLAG for the Architect | machine-state snapshot frontier W14 lags the ledger frontier W15 by one wave (open-program boundary; closed by the final reconciliation commit); strict field equality is enforced in the terminal (ROADMAP_COMPLETE) state; in the open state the projection may lag the ledger by at most the single merge-reconciliation boundary and every lag is recorded above"
+    },
+    {
+      "id": "G11",
+      "title": "FRESH_AGENT_RECOVERABLE",
+      "area": "fresh-agent recovery",
+      "status": "PASS",
+      "details": "the mechanical zero-history recovery chain is complete and contradiction-free (ARCHITECT_START_HERE.md, AGENTS.md, dev-state README, frozen specs G01, roadmap G01, implementation-state G04, current-state G10, Work Orders G10, checkpoints G08, and G01–G10 all PASS) — repository state alone answers SOS-IMPLEMENTATION-PROCESS §14 (active Work Order, merged dependencies, exact heads, verification evidence, frontier); REVIEW-TIME (not machine-decidable): the human zero-history walkthrough — a fresh reviewer bootstraps via ARCHITECT_START_HERE.md and states the frontier from repository state alone — is executed and recorded in the sign-off record (packet item 6), never assumed"
+    },
+    {
+      "id": "G12",
+      "title": "SIGNOFF_PACKET_READY",
+      "area": "final sign-off",
+      "status": "PASS",
+      "details": "the Worker-owned sign-off packet components exist at the head: W14 adversarial-evidence matrix present (G07); W15 checkpoint cites the three verification commands' results (pytest / compileall / final_gate_check); complete W1–W15 checkpoint chain (G08); gate report present at the report path. REVIEW-TIME (deliberately NOT script checks): the sign-off record itself is Architect-authored at approval (spec/development-state/W15-final-sign-off.md, outside the Worker's surface) and open-PR / PR-identity reconciliation is an Architect review-time check — the gate never approves (process §11)"
+    }
+  ],
+  "overall": "PASS"
+}
