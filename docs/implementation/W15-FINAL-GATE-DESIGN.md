@@ -403,7 +403,7 @@ initializes it, and the stabilized state is what the determinism contract
 covers; the test suite asserts exactly this).
 
 The committed report cites `repoHead` = the implementation head
-`4c4a6fc1912a1d625f0c5e914e76a81da3e4ae8e` and was generated with the full
+`6c7d78482c41e01403ddd75398496fcefe0b6262` and was generated with the full
 branch content in place (the two-commit convention, W10–W14 precedent and
 the W14 matrix `repoHead` reconciliation in particular): the branch tip
 carries the report, the checkpoint, and this reconciliation as a

@@ -301,6 +301,10 @@ Changing the baseline is a review-visible diff; it authorizes nothing.
    reconciles green at the exact head; the two non-blocking observations
    are items 1 (the recorded projection lag, closed by the final
    reconciliation commit) and 3 (the W13 typo, escalated).
+7. **Design §9 implementation-head mis-citation, corrected in review
+   iteration 2 (dangling `4c4a6fc…` → true `6c7d784…`):** prose-only fix
+   on this branch, aligning the design doc with the committed report's
+   and this checkpoint's implementation-head citations.
 
 ## Known limitations (filled)
 
