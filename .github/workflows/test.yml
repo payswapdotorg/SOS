@@ -8,7 +8,16 @@ jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0 (full history): the W15 final-gate integration test
+      # (tests/test_w15_final_gate_check.py::test_real_repository_gate_logic_with_git_resolver)
+      # resolves historical SHAs across the whole W0-W15 lineage through the
+      # real Git resolver — the default shallow clone (depth 1) left every
+      # pre-merge SHA unresolved and failed G04. Full history STRENGTHENS
+      # CI: the lineage checks actually execute. (2026-10-01 post-merge TL
+      # infrastructure repair, disclosed in the W15 sign-off record.)
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
