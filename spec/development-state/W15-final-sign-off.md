@@ -104,3 +104,31 @@ terminal state is recorded in `spec/development-state/implementation-state.json`
 (`status: ROADMAP_COMPLETE`, `currentFrontier: []`, `currentTask: null`).
 Frozen documents remain byte-identical v1.0 — completion is recorded in
 canonical state, never by rewriting frozen semantics.
+
+## Terminal-state verification and adaptation (2026-10-01, post-merge)
+
+After the merge (`414f2a61`) and the initial reconciliation commit, the
+terminal `ROADMAP_COMPLETE` state was verified with the delivered gate
+machinery itself. One state-coverage gap surfaced and was corrected under
+post-merge Architect/TL reconciliation authority:
+
+- **Finding:** `tests/test_w15_final_gate_check.py::test_real_repository_gate_logic_with_git_resolver`
+  asserted the open-program G10 detail form ("lags ledger by one wave")
+  unconditionally; at the terminal state (where the final reconciliation
+  closed the recorded lag and G10 enforces strict field equality — the
+  DESIGNED terminal semantics) the assertion inverted and failed, cascading
+  G06→G11 in full-gate runs.
+- **Adaptation:** the single terminal assertion was made state-aware
+  (ledger status ROADMAP_COMPLETE → assert the terminal
+  "TERMINAL strict field equality enforced" form; otherwise the open
+  "lags ledger by one wave" form). Expectation strength preserved — exactly
+  one of the two forms must be present. No other test or gate logic touched.
+- **Terminal proof (run personally at the post-adaptation terminal head):**
+  `python3 -m pytest` → **551 passed**; `python3 -m compileall -q src tests`
+  → **CLEAN**; `python3 tools/final_gate_check.py` → **OVERALL: PASS —
+  12/12 checks PASS (0 FAIL, 0 DEFERRED)** at the terminal head. The
+  completed roadmap passes its own final gate.
+- **Governance note:** this adaptation post-dates the approved reviewed
+  head `9709c06` and touches one Worker-surface test file; it is disclosed
+  here (and in the terminal commit) per the reconciliation discipline, and
+  the terminal state was re-verified green end-to-end as recorded above.

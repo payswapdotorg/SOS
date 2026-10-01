@@ -1877,5 +1877,16 @@ def test_real_repository_gate_logic_with_git_resolver() -> None:
     deferred = [k for k, r in results.items() if r.status == fgc.STATUS_DEFERRED]
     assert deferred == ["G06"]
     assert results["G06"].status == fgc.STATUS_DEFERRED
-    # G10 records the open-program projection lag explicitly.
-    assert "lags ledger by one wave" in results["G10"].details
+    # G10 records the open-program projection lag explicitly (open state);
+    # at the terminal ROADMAP_COMPLETE state (post-final-reconciliation
+    # main, where the final reconciliation commit closed the recorded lag
+    # and the ledger enforces strict field equality) the details carry the
+    # terminal form instead. State-aware since 2026-10-01 (terminal-state
+    # adaptation under post-merge Architect/TL authority — disclosed in
+    # spec/development-state/W15-final-sign-off.md; expectation strength
+    # preserved: exactly one of the two G10 detail forms must be present).
+    _ledger_status = (state.impl_state or {}).get("status")
+    if _ledger_status == "ROADMAP_COMPLETE":
+        assert "TERMINAL strict field equality enforced" in results["G10"].details
+    else:
+        assert "lags ledger by one wave" in results["G10"].details

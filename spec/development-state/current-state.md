@@ -101,3 +101,5 @@ Independent verification evidence stack at the exact reviewed head `9709c06c8b89
 - Incident note (process record): the W15 dispatch itself survived a 14-hour dead-queue state (the platform's queued chats never auto-start; evidence: multiple never-opened prompts). The dead session was voided and the delivery re-landed via the sanctioned capacity-recovery assault (round 2/12) at 2026-10-01T10:38Z; the turn opened 3 seconds after the send and generated genuinely to completion — no fabrication involved at any point.
 
 The merge `414f2a61` (PR #22) is the authoritative completion of W15 and of the SOS-v1 roadmap. ROADMAP_COMPLETE.
+
+Terminal verification (2026-10-01): at the post-reconciliation terminal head the full battery is green — **551 passed**, `compileall` **CLEAN**, `tools/final_gate_check.py` **OVERALL: PASS — 12/12 checks PASS (0 FAIL, 0 DEFERRED)** — the completed roadmap passes its own final gate. One integration-test state-coverage gap (unconditional open-program G10 detail assertion) was adapted state-aware under post-merge Architect/TL authority and disclosed in the sign-off record.
