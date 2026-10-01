@@ -132,3 +132,7 @@ post-merge Architect/TL reconciliation authority:
   head `9709c06` and touches one Worker-surface test file; it is disclosed
   here (and in the terminal commit) per the reconciliation discipline, and
   the terminal state was re-verified green end-to-end as recorded above.
+
+## CI reconciliation (2026-10-01)
+
+The GitHub Actions `tests` workflow initially failed on the merge/reconciliation heads (shallow default checkout, depth 1): the W15 real-repo integration test resolves historical SHAs across the whole W0–W15 lineage, which a shallow clone cannot see (G04 "does not resolve"; W13/W14 suites never needed history, so earlier runs were green). Repaired under post-merge TL infrastructure authority: `.github/workflows/test.yml` now checks out FULL history (`fetch-depth: 0`) — a verification-strengthening change (the lineage checks actually execute on CI). Terminal CI at head `a956325d…`: **success** (run 36862856731, 2026-10-01). The completed roadmap is green locally AND on CI at the terminal head.

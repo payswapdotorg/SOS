@@ -103,3 +103,5 @@ Independent verification evidence stack at the exact reviewed head `9709c06c8b89
 The merge `414f2a61` (PR #22) is the authoritative completion of W15 and of the SOS-v1 roadmap. ROADMAP_COMPLETE.
 
 Terminal verification (2026-10-01): at the post-reconciliation terminal head the full battery is green — **551 passed**, `compileall` **CLEAN**, `tools/final_gate_check.py` **OVERALL: PASS — 12/12 checks PASS (0 FAIL, 0 DEFERRED)** — the completed roadmap passes its own final gate. One integration-test state-coverage gap (unconditional open-program G10 detail assertion) was adapted state-aware under post-merge Architect/TL authority and disclosed in the sign-off record.
+
+CI reconciliation (2026-10-01): the `tests` workflow now checks out full history (`fetch-depth: 0`) — the W15 integration test verifies the W0–W15 lineage on CI, which the default shallow clone could not resolve. Terminal CI: **success** at `a956325d` (run 36862856731).
