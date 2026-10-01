@@ -1,8 +1,12 @@
 # W15 Final Gate Design (repository-level reconciliation and evidence gate)
 
-**Status:** PLANNED — Work Order PREPARED, DISPATCH BLOCKED (W14 unmerged at
-preparation; this design is the authoritative specification of the gate a
-future Worker implements mechanically once W15 is dispatched)
+**Status:** IMPLEMENTED — reconciled to the implemented contract by the W15
+Worker (work branch `work/w15-final-gate`); §§1–7 (the prepared design)
+are preserved verbatim below — extend, never weaken — and §§8–14 record the
+implemented contract, its reconciliations to the repository's actually
+recorded conventions, the baseline as shipped, and the test coverage map.
+The Work Order `spec/work-orders/W15-final-architect-gate.md` remains the
+normative authority.
 **Work Order:** `spec/work-orders/W15-final-architect-gate.md` (prepared;
 frozen once dispatched)
 **Dependencies at preparation:** W14 NOT merged (itself blocked on
@@ -213,3 +217,289 @@ assumed — the reviewer's lack of history is the test condition.
 - No dependence on unmerged work: the design binds W12/W13/W14 only through
   their merged Work Orders and actual merges (gate baseline filled at
   dispatch from verified repo facts).
+
+## 8. The implemented check semantics (reconciled to the repository's recorded conventions)
+
+The prepared design §2 is the specification; this section records the
+implemented contract. Every reconciliation below EXTENDS the prepared
+semantics or keys it to a convention the repository actually records — none
+weakens a prepared guarantee; each is covered by negative fixtures in
+`tests/test_w15_final_gate_check.py` and disclosed in the W15 checkpoint's
+honest-deviations section.
+
+**G01 FROZEN_AUTHORITY_INTEGRITY** — implemented exactly as prepared: the
+five frozen documents must be byte-identical (sha256) to the dispatch-time
+gate baseline (§10). The baseline records data; the Architect verifies the
+digests against frozen v1.0 at review (review-time, named in the protocol).
+
+**G02 MODULE_SURFACE_CONFORMANCE** — implemented exactly as prepared
+(§10's wave→module map; W12 `optimization.py` and W13 `selfevolution.py`
+taken from their merged Work Orders).
+
+**G03 REQUIREMENTS_COVERED** — the prepared semantics, with the repository's
+actual requirement-line syntaxes handled faithfully: the Work-Order scan
+parses each Work Order's "Requirements:"/"Primary requirements:" line and
+expands `Rn–Rm` ranges and `Rn/Rm` slash pairs (the W1–W6 and W7+ line
+formats respectively); the W14 verification mapping is scanned (with the
+same expansion) from the W14 design doc and the W14 checkpoint; the roadmap
+ledger table ("## Frozen task ledger") is parsed for the task set; every
+row W0–W14 must have a COMPLETE task with a merge (W0 via the recorded
+`bootstrapCommit` exception). Task-set equality between the roadmap ledger
+and `implementation-state.json` is enforced here (G04's coverage direction
+cites it).
+
+**G04 STATE_VS_GIT** — implemented as prepared, plus a checkpoint
+merge-label cross-check (a "**Merge SHA:**" claim must equal the ledger
+`mergedAs`; W1 carries one, and it reconciles), plus the squash-era
+PR-head exemption below. Coverage direction (Work Order + checkpoint +
+design-doc existence) is enforced by G08/G10 and cited in G04's details,
+per the prepared design's own "(see G08/G10)".
+
+**The §2 squash-era PR-head exemption (G04(v)/G08 reconciliation).** A
+checkpoint head claim that is NOT ancestral to its wave's merge (G04(v)) or
+to HEAD (G08) is lawful ONLY when (a) the claim line's own label matches
+the review/PR-head reference convention (ARCHITECT-REVIEW-PROTOCOL §2:
+"Review head" / "Reviewed head" / "PR `head.sha`" / an explicit §2
+citation), (b) the claimed SHA resolves, and (c) the wave's merge is a
+single-parent commit (squash-era topology — the branch content was replayed
+onto the base, so the PR head is genuinely not an ancestor of `main`; the
+W1 merge `091d4d10` is exactly this form). A non-ancestral
+"implementation head" claim FAILs; the same review-head claim under a TRUE
+(two-parent) merge FAILs; a dangling review-head reference FAILs. The
+convention is recognized ONLY within the claim line itself (label + the
+claim line + its immediate continuation), never anywhere in the file, so a
+stale head cannot hide behind an unrelated §2 mention. Every exemption is
+recorded in the report details.
+
+**G05 DEPENDENCY_ANCESTRY** — implemented exactly as prepared: all 30
+declared edges (W0 via its `bootstrapCommit`) must be real ancestry
+relations; for the active/unmerged task (W15 at the reviewed head) every
+dependency merge must be ancestral to the reviewed head; and every W0–W14
+merge must be ancestral to the W15 reviewed head.
+
+**G06 SUITE_GREEN** — implemented as prepared: report mode launches
+`python -m pytest` and `python -m compileall -q src tests` as local
+subprocesses from the repository root (never edit-to-green); check-only
+mode launches no subprocess and records G06 as DEFERRED (tolerated by the
+exit contract: report mode exits 0 iff every check passes; check-only
+exits 0 iff no check FAILs). The extend-never-weaken threshold is
+RE-PARSED from the W14 checkpoint's recorded "Exact pass count: **478**"
+at run time (dispatch-baseline 478 as the verified fallback — a regression
+guard also asserted by the test suite). The exact counts go into the
+report's `commands` object.
+
+**G07 ADVERSARIAL_EVIDENCE** — implemented exactly as prepared (schema,
+the sixteen frozen case ids each present at least once, every verdict
+PASS, `repoHead` ancestral of HEAD). The baseline records the sixteen ids
+in their persisted matrix realization (`ADV-01-missing-evidence` …
+`ADV-16-partial-failure-recovery`), which is the operator-mandated
+verbatim catalog in catalog order.
+
+**G08 CHECKPOINTS_CURRENT** — the prepared head-claim semantics, keyed to
+the repository's recorded checkpoint conventions: a claim line is a bold
+label naming a base / head / tip / merge / implementation-SHA claim (the
+W1–W15 forms, including "Latest implementation SHA" and the W11+ multi-line
+label form whose SHA sits on the following line); base claims must resolve
+and be reachable from HEAD; head claims must resolve and be
+ancestor-or-equal of HEAD, or be lawful under the §2 squash-era exemption
+above. Dangling NON-claim narrative citations (outside any claim label)
+are recorded as observations in the details — the prepared check never
+covered prose citations, and recording extends the report's evidence
+without changing pass/fail semantics (the W13 checkpoint's one-character
+typo of the W12 dispatch point is recorded this way and escalated in the
+W15 checkpoint).
+
+**G09 ROLLBACK_SAFETY** — the prepared carrier semantics with the baseline
+recording, per wave, WHICH file carries the declaration and in WHICH form:
+W3–W15 carry a rollback section (heading/label match + a mechanism
+statement, e.g. "ordinary Git revert …"); W1/W2 predate that convention
+(their checkpoints date to the program's first waves) and carry the
+early-wave scope-exclusion form ("W1 intentionally contains no runtime
+observation … / No runtime architecture recovery … changes"), which states
+the same fact G09 exists to demonstrate — the wave introduced nothing
+beyond its additive surface, so ordinary Git revert is complete recovery.
+G02 (exactly the frozen module surface) and G06 (the suite green,
+including every wave's rollback-invariant tests) co-enforce, per the
+prepared design. Additionally the implemented check scans the whole
+repository tree for deployment/migration/network artifacts
+(Dockerfile/compose/terraform/helm/k8s/migrations/alembic/SQL patterns;
+`.git`/`.github`/caches excluded) — a mechanical extension proving no
+merged wave left unrevertable external state.
+
+**G10 DOCS_RECONCILED (the one substantive reconciliation).** The prepared
+design required field-by-field equality of `current-state.md` with HEAD
+and the machine state. Two recorded repository facts make literal equality
+impossible at any commit that contains the projection: (a) the live-main
+SHA line cannot embed the SHA of the commit that carries it — the
+repository's own recorded convention (since the W12-era reconciliations)
+is the "recompute from live Git" instruction with milestone SHAs; (b) the
+projection header is rewritten by merge-reconciliation commits under
+Architect/TL authority AFTER each merge, and the Work Order's own sign-off
+protocol assigns the FINAL projection update to the post-merge final
+reconciliation commit — the Worker may never touch it. At the W15 dispatch
+base the projection lags the ledger by exactly one wave (the W14
+reconciliation `c04ddf1` updated the ledger but only appended the W14 gate
+record to `current-state.md`). The implemented semantics preserve every
+guarantee the prepared check existed for (a stale projection breaking the
+zero-history rule) while keying to the recorded lifecycle:
+
+- every wave W1–W15 has its Work Order and design doc (baseline
+  filenames) — as prepared;
+- the four projection fields must be present — as prepared;
+- the live-main line: EITHER a literal 40-hex SHA equal to actual HEAD
+  (the strict prepared form), OR the recorded recompute convention, in
+  which every cited milestone SHA must resolve and be ancestral of HEAD;
+  a plain literal SHA that is not HEAD FAILs (the W10-era stale-recording
+  defect class the prepared design wanted caught);
+- the last-completed wave's cited merge must be EXACTLY the ledger's
+  `mergedAs` for that wave (a wrong or dangling SHA FAILs), and the wave
+  must never be AHEAD of the ledger (a false completion claim FAILs);
+- the frontier must be a real ledger task, never ahead of the ledger
+  frontier;
+- while the program is OPEN (ledger status ≠ ROADMAP_COMPLETE): the
+  last-completed/frontier/machine-state-snapshot fields may lag the ledger
+  by AT MOST the single merge-reconciliation boundary (one wave); any lag
+  is RECORDED in the report details and flagged REVIEW-TIME for the
+  Architect ("the final reconciliation commit closes it" — the Work
+  Order's own risk section); a lag of two or more waves FAILs (a genuinely
+  broken recovery chain);
+- in the TERMINAL state (ROADMAP_COMPLETE): strict field equality — the
+  last-completed must be the highest COMPLETE wave (W15) with its exact
+  merge, the frontier must be the none-form or exactly the (empty) ledger
+  frontier, and the machine-state snapshot must be empty — enforced
+  exactly as the prepared design specified, at the one state where it is
+  enforceable.
+
+At the W15 reviewed head the committed report's G10 details record the
+observed one-wave lag verbatim and the Architect flag; the W15 checkpoint
+escalates it (deviation 1).
+
+**G11 FRESH_AGENT_RECOVERABLE** — implemented as prepared (mechanical
+proxy: bootstrap artifacts + G01–G10). G06's check-only DEFERRED is
+tolerated (it is not a broken link; the subprocess evidence is collected
+in report mode). The human half is REVIEW-TIME and named in the details
+and the sign-off protocol.
+
+**G12 SIGNOFF_PACKET_READY** — implemented as prepared: the Worker-owned
+packet components (the W14 matrix, the W15 checkpoint citing the three
+verification commands' results, the complete W1–W15 checkpoint chain, and
+the gate report — present at the report path, or produced by the current
+report-mode run). The sign-off record itself and open-PR/PR-identity
+reconciliation are REVIEW-TIME (deliberately not script checks; the gate
+never approves).
+
+## 9. The report and its determinism (as implemented)
+
+Report schema — exactly the prepared §2 schema:
+`{"schema": "sos-w15-gate-report/1.0", "repoHead", "commands": {"pytest":
+{"exitCode", "passed"}, "compileall": {"exitCode"}}, "checks": [{id,
+title, area, status, details}], "overall"}` — written in report mode only,
+to exactly one file (the report path argument; default
+`spec/development-state/W15-gate-report.json`), UTF-8 JSON with a sorted
+deterministic layout. No clocks, no randomness, no network: two runs over
+identical repository state produce byte-identical JSON (the report-path
+presence of the report file itself is part of the state — the first write
+initializes it, and the stabilized state is what the determinism contract
+covers; the test suite asserts exactly this).
+
+The committed report cites `repoHead` = the implementation head
+`6c7d78482c41e01403ddd75398496fcefe0b6262` and was generated with the full
+branch content in place (the two-commit convention, W10–W14 precedent and
+the W14 matrix `repoHead` reconciliation in particular): the branch tip
+carries the report, the checkpoint, and this reconciliation as a
+documentation-only delta; a tip re-run reproduces identical verdicts and
+differs only in the regenerated `repoHead` (the tip SHA).
+
+## 10. The gate baseline as shipped
+
+Frozen-doc sha256 digests (recorded at dispatch from the verified base
+`c04ddf1314ebda2c23467367099bfbe7b32972b5`; the test suite re-verifies them
+against the actual files at every run):
+`spec/architecture.md`
+`c711b626d430f58046ae5532bd0c4bc30782a2d82248f84689e4f9a37cf7218d`;
+`spec/architecture-lock.md`
+`83f88bd6de7e2a770911d77dc619fec7613593f87df76bfb154dd2269e219382`;
+`spec/constitution.md`
+`3c1067f59fbdb8f818032a1a7c33a4ae127887aa0c25bbe740f382e52be4d63d`;
+`spec/requirements.md`
+`21af44a902561788e09e36a9d9caab892647c3ab21565b12d1a022667427fd30`;
+`spec/implementation-roadmap.md`
+`22d8d90afcfcd19828ac5104d324bc835c89c5abe181bb64ca33ef37e1cb0cff`.
+Wave→module map: W1 `model.py`; W2 `graph.py`; W3 `recovery.py`; W4
+`evidence.py`; W5 `causal.py`; W6 `candidates.py`; W7 `assurance.py`; W8
+`experimentation.py`; W9 `autonomy.py`; W10 `personalization.py` +
+`platform.py`; W11 `execution.py`; W12 `optimization.py`; W13
+`selfevolution.py`; W14/W15 none. The sixteen W14 case ids and the W14
+count floor (478, re-parsed at run time) as in §8. Per-wave Work
+Order/design-doc filenames, per-wave rollback carriers (W1/W2
+scope-exclusion; W3–W15 section+mechanism), the W0 bootstrap exception,
+and the deployment-artifact scan patterns complete the table. Changing the
+baseline is a review-visible diff; it authorizes nothing.
+
+## 11. The script architecture as implemented
+
+One stdlib-only file, `tools/final_gate_check.py`: a module-level baseline
+table (§10); `GateState` (the parsed repository content + injected command
+results); the `RevisionResolver` protocol (`head`, `exists`,
+`is_ancestor` with Git ancestor-or-equal semantics, `parents` via
+`git log -n1 --format=%P` — read-only plumbing only) with `GitResolver`
+as the thin Git-backed adapter and the tests' in-memory DAG resolver;
+`CommandResults` for the injected G06 evidence; the ten primary checks as
+pure `(GateState, RevisionResolver) -> CheckResult` functions; the G11
+composite (explicit prior results input) and G12 (packet facts) closers;
+`run_gate`, `build_report`, the CLI (`--report [PATH]` / `--check-only` /
+`--root`, defaulting to the root containing `tools/`). Exit codes: 0 iff
+every check passes (report mode) / no check FAILs (check-only); 1 on any
+FAIL; 2 on tool misuse (unreadable root / no Git HEAD). The tool is
+importable for the tests (the tests insert `tools/` on `sys.path`) but is
+never imported by `src/sos/` and adds no `sos` exports.
+
+## 12. Review-time items (explicit, per acceptance criterion C1)
+
+The fresh-agent human walkthrough (packet item 6); the Architect-authored
+sign-off record `spec/development-state/W15-final-sign-off.md`;
+open-PR/PR-identity reconciliation; the verification of the gate baseline
+digests against the frozen v1.0 documents; and the final reconciliation
+commit that closes the recorded open-program projection lag. These are
+named in the check details, the stdout summary, the report, and the W15
+checkpoint — never silently assumed mechanical.
+
+## 13. The test coverage map (as implemented)
+
+`tests/test_w15_final_gate_check.py` (73 items: 70 functions, one of them
+parametrized over the G06 command-failure modes): the positive
+mini-repository fixture (every check PASS, the §2 exemption recorded, the
+report shape exactly per schema); per-check negative fixtures for every
+machine-checkable item — including every negative named by the Work
+Order's "Required regression coverage" (dangling merge SHA; COMPLETE task
+without a merge; dependency NOT an ancestor; missing matrix case; non-PASS
+verdict; stale/unreachable checkpoint head; current-state.md SHA mismatch;
+extra `src/sos` module; missing design doc) — each engineered so exactly
+the targeted check FAILs, with the G11 composite (which by design requires
+G01–G10) and a small set of honestly-documented cascades (G12's packet
+components; G05's dependency edges) as the only additional failures, each
+asserted explicitly; the §2 exemption matrix (topology guard,
+resolvability guard, non-review-label guard); G06's threshold parse and
+fallback; determinism (byte-identical stabilized runs); read-only behavior
+(tree hash + file set unchanged by a check-only CLI run); the
+resolver-injection boundary (subprocess poisoned — zero subprocess usage
+in check logic); the GitResolver adapter against a temp git repository;
+CLI end-to-end (check-only exit 0; report mode with a real passing
+micro-suite, byte-identical second run; exit 1 on a failing gate; exit 2
+on a non-repository root); the shipped baseline self-verification against
+the actual repository; and the real-repository integration test through
+the real Git plumbing (skipped at the implementation head — its subject
+artifacts are the tip's documentation-only delta — and re-proving the
+committed report's verdicts at the tip and after merge).
+
+## 14. Non-goals honored
+
+No new architecture, authority class, subsystem, product semantics or
+ports; no `src/sos/` change and no `sos` exports; no frozen-document,
+roadmap-semantic, Work-Order-machinery, W1–W14-artifact, `.github/**` or
+`pyproject.toml` change; no test modifications or re-runs-to-green; no
+`ROADMAP_COMPLETE`, no merge, no PR creation, no successor dispatch; no
+network/GitHub-API/credential dependence; no self-approval — PASS is
+mechanical evidence for the Architect's sign-off, never a substitute
+(process §11). The diff touches exactly the five Work-Order-allowed files
+(`git diff --name-only c04ddf1314ebda2c23467367099bfbe7b32972b5..HEAD`).
