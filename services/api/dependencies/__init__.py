@@ -7,9 +7,11 @@ from typing import Any, Callable
 
 from fastapi import Depends, Request
 
+from fastapi import Query
+
 from ..auth.session import SessionIdentity, resolve_session
 from ..container import ApiContainer
-from ..errors import not_found, unauthenticated
+from ..errors import not_found, unauthenticated, validation
 from providers.neon.seam import TenantScope  # noqa: E402  (repo-root import)
 
 
@@ -100,4 +102,34 @@ def ensure_workspace_access(
 ) -> None:
     if not scope.allows(workspace_id):
         # Cross-tenant: 404 hides existence (zero rows already leaked none).
+        raise not_found("workspace not found")
+
+
+def cursor_param(
+    cursor: str | None = Query(default=None),
+) -> str | None:
+    """Validate the opaque pagination cursor upfront (422 VALIDATION
+    envelope for malformed cursors — never a raw 500)."""
+    if cursor is None:
+        return None
+    from providers.neon.local import decode_cursor
+
+    if decode_cursor(cursor) is None:
+        raise validation(f"invalid pagination cursor {cursor!r}")
+    return cursor
+
+
+def require_workspace_membership(
+    container: ApiContainer,
+    session: SessionIdentity,
+    workspace_id: str,
+) -> None:
+    """Mutations require MEMBERSHIP in the target workspace — the demo
+    workspace is readable by authenticated users but mutable only by its
+    members (SECURITY S21)."""
+    member_ids = {
+        str(w["id"])
+        for w in container.persistence.workspaces_for_user(session.user_id)
+    }
+    if workspace_id not in member_ids:
         raise not_found("workspace not found")

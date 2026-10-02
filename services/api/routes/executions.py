@@ -16,9 +16,11 @@ from ..auth.session import SessionIdentity
 from ..container import ApiContainer
 from ..dependencies import (
     audit_writer,
+    cursor_param,
     get_container,
     now_iso,
     require_authenticated,
+    require_workspace_membership,
     tenant_scope,
 )
 from ..errors import not_found, provider_unavailable, validation
@@ -48,7 +50,7 @@ def list_executions(
     workspace_id: str | None = Query(default=None, alias="workspaceId"),
     experiment_id: str | None = Query(default=None, alias="experimentId"),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_executions(
         scope, workspace_id=workspace_id, experiment_id=experiment_id,
@@ -74,6 +76,7 @@ def dispatch_execution(
     if experiment_row is None:
         raise not_found("experiment not found")
     workspace_id = str(experiment_row["workspace_id"])
+    require_workspace_membership(container, session, workspace_id)
     check_write_quota(container, session)
 
     decisions_rows = [

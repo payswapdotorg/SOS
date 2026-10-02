@@ -10,9 +10,11 @@ from ..auth.session import SessionIdentity
 from ..container import ApiContainer
 from ..dependencies import (
     audit_writer,
+    cursor_param,
     get_container,
     now_iso,
     require_authenticated,
+    require_workspace_membership,
     tenant_scope,
 )
 from ..errors import not_found, validation
@@ -30,7 +32,7 @@ def list_jobs(
     workspace_id: str | None = Query(default=None, alias="workspaceId"),
     type_: str | None = Query(default=None, alias="type"),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_jobs(
         scope, workspace_id=workspace_id, type_=type_,
@@ -52,6 +54,7 @@ def create_job(
 
     if not scope.allows(body.workspace_id):
         raise not_found("workspace not found")
+    require_workspace_membership(container, session, body.workspace_id)
     check_write_quota(container, session)
 
     idempotency_key = body.idempotency_key or (

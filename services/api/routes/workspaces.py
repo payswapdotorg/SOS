@@ -10,6 +10,7 @@ from ..auth.session import SessionIdentity
 from ..container import ApiContainer
 from ..dependencies import (
     audit_writer,
+    cursor_param,
     get_container,
     now_iso,
     require_authenticated,
@@ -36,7 +37,7 @@ def list_workspaces(
     scope: TenantScope = Depends(tenant_scope),
     container: ApiContainer = Depends(get_container),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_workspaces(
         scope, cursor=cursor, limit=limit

@@ -10,9 +10,11 @@ from ..auth.session import SessionIdentity
 from ..container import ApiContainer
 from ..dependencies import (
     audit_writer,
+    cursor_param,
     get_container,
     now_iso,
     require_authenticated,
+    require_workspace_membership,
     tenant_scope,
 )
 from ..errors import not_found, validation
@@ -45,7 +47,7 @@ def list_systems(
     container: ApiContainer = Depends(get_container),
     workspace_id: str | None = Query(default=None, alias="workspaceId"),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_systems(
         scope, workspace_id=workspace_id, cursor=cursor, limit=limit
@@ -66,6 +68,7 @@ def create_system(
 
     if not scope.allows(body.workspace_id):
         raise not_found("workspace not found")
+    require_workspace_membership(container, session, body.workspace_id)
     check_write_quota(container, session)
     system_id = "sys-" + _slugish(body.name)
     if body.mode == "brownfield":
@@ -140,6 +143,7 @@ def start_recovery(
     if system is None:
         raise not_found("system not found")
     workspace_id = str(system["workspace_id"])
+    require_workspace_membership(container, session, workspace_id)
     check_job_quota(container, workspace_id, "system_recovery")
 
     current = None
@@ -269,7 +273,7 @@ def recovery_status(
     scope: TenantScope = Depends(tenant_scope),
     container: ApiContainer = Depends(get_container),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     system = container.persistence.get_system(scope, system_id)
     if system is None:

@@ -7,7 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from ..container import ApiContainer
-from ..dependencies import get_container, tenant_scope
+from ..dependencies import cursor_param, get_container, tenant_scope
 from ..errors import validation
 from ..orchestration import WIRE_EVIDENCE_KINDS
 from ..schemas.common import CollectionEnvelope
@@ -26,7 +26,7 @@ def list_evidence(
     kind: str | None = Query(default=None),
     status: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     if kind is not None and kind not in WIRE_EVIDENCE_KINDS:
         raise validation(
@@ -52,7 +52,7 @@ def list_hypotheses(
     container: ApiContainer = Depends(get_container),
     workspace_id: str | None = Query(default=None, alias="workspaceId"),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_hypotheses(
         scope, workspace_id=workspace_id, cursor=cursor, limit=limit

@@ -42,6 +42,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._container = container
 
     async def dispatch(self, request: Request, call_next: Any):
+        # The readiness probe is exempt: it must ALWAYS answer truthfully
+        # (that is its purpose), even when the coordination plane is down.
+        if request.url.path == "/api/v1/health":
+            return await call_next(request)
         settings = self._container.settings
         coordination = self._container.coordination
         ip = _client_ip(request)
@@ -60,26 +64,47 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     ),
                 )
 
-        # Per-IP bucket (all traffic).
-        ip_limit = settings.rate_anon_per_min + settings.rate_user_per_min
-        decision = coordination.rate_limit(
-            "ip", ip, limit=ip_limit, window_seconds=60
-        )
+        # Per-IP bucket (all traffic). A coordination-plane failure fails
+        # CLOSED for protected traffic (503 PROVIDER_UNAVAILABLE) — the
+        # health endpoint above still reports the true seam state.
+        try:
+            ip_limit = settings.rate_anon_per_min + settings.rate_user_per_min
+            decision = coordination.rate_limit(
+                "ip", ip, limit=ip_limit, window_seconds=60
+            )
+        except Exception as exc:
+            return self._coordination_down(str(exc))
         if not decision.allowed:
             return self._too_many(decision.retry_after_seconds)
 
-        # Identity bucket: anonymous vs authenticated.
-        session = resolve_session(request, self._container.persistence)
-        if session.authenticated:
-            decision = coordination.rate_limit(
-                "user", str(session.user_id),
-                limit=settings.rate_user_per_min, window_seconds=60,
-            )
-        else:
-            decision = coordination.rate_limit(
-                "anonymous", ip,
-                limit=settings.rate_anon_per_min, window_seconds=60,
-            )
+        # Identity bucket: anonymous vs authenticated. The session-exchange
+        # endpoints (login/logout) are exempt from the IDENTITY bucket —
+        # they carry no session yet — but stay under the per-IP bucket.
+        session_exchange = request.url.path in (
+            "/api/v1/auth/login", "/api/v1/auth/logout",
+        )
+        try:
+            if session_exchange:
+                decision = coordination.rate_limit(
+                    "auth", ip,
+                    limit=settings.rate_anon_per_min, window_seconds=60,
+                )
+            else:
+                session = resolve_session(
+                    request, self._container.persistence
+                )
+                if session.authenticated:
+                    decision = coordination.rate_limit(
+                        "user", str(session.user_id),
+                        limit=settings.rate_user_per_min, window_seconds=60,
+                    )
+                else:
+                    decision = coordination.rate_limit(
+                        "anonymous", ip,
+                        limit=settings.rate_anon_per_min, window_seconds=60,
+                    )
+        except Exception as exc:
+            return self._coordination_down(str(exc))
         if not decision.allowed:
             return self._too_many(decision.retry_after_seconds)
 
@@ -87,6 +112,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         response.headers["X-RateLimit-Limit"] = str(decision.limit)
         response.headers["X-RateLimit-Remaining"] = str(decision.remaining)
         return response
+
+    @staticmethod
+    def _coordination_down(reason: str) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content=error_body(
+                "PROVIDER_UNAVAILABLE",
+                "the coordination plane is unavailable; protected traffic "
+                "fails closed",
+                {"reason": reason},
+            ),
+        )
 
     @staticmethod
     def _too_many(retry_after: int) -> JSONResponse:

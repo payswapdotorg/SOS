@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from ..container import ApiContainer
-from ..dependencies import get_container, tenant_scope
+from ..dependencies import cursor_param, get_container, tenant_scope
 from ..schemas.execution import LearningRecordDTO, MemoryEntryDTO
 from ..schemas.common import CollectionEnvelope
 from providers.neon.seam import TenantScope  # noqa: E402
@@ -18,7 +18,7 @@ def list_learning(
     container: ApiContainer = Depends(get_container),
     workspace_id: str | None = Query(default=None, alias="workspaceId"),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_learning(
         scope, workspace_id=workspace_id, cursor=cursor, limit=limit
@@ -33,7 +33,7 @@ def list_memory(
     container: ApiContainer = Depends(get_container),
     workspace_id: str | None = Query(default=None, alias="workspaceId"),
     limit: int = Query(default=50, ge=1, le=100),
-    cursor: str | None = Query(default=None),
+    cursor: str | None = Depends(cursor_param),
 ) -> dict:
     page = container.persistence.list_memory(
         scope, workspace_id=workspace_id, cursor=cursor, limit=limit

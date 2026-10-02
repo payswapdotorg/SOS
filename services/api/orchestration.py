@@ -645,11 +645,15 @@ def run_system_recovery(
 
     The repository root comes from the seam (LOCAL: the fixture tree;
     PUB-04+: the materialized pinned revision)."""
-    commit = (
-        github.resolve_ref(repository_url, ref)
-        if ref
-        else github.get_commit(repository_url, fallback_revision or "")
-    )
+    if ref:
+        commit = github.resolve_ref(repository_url, ref)
+    elif fallback_revision:
+        commit = github.get_commit(repository_url, fallback_revision)
+    else:
+        # No explicit ref: pin the repository's DEFAULT BRANCH to its exact
+        # head commit — never a mutable "latest" reference (S11).
+        default_branch = github.resolve_repository(repository_url).default_branch
+        commit = github.resolve_ref(repository_url, default_branch)
     root = github.repository_root(repository_url)
     from sos.recovery import recover_repository as _recover
 

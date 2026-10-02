@@ -34,7 +34,7 @@ _JSON_COLUMNS: dict[str, frozenset[str]] = {
     "system_revisions": frozenset({
         "uncertainty", "source_ref", "recovery", "graph",
     }),
-    "evidence": frozenset({"provenance"}),
+    "evidence": frozenset({"provenance", "result"}),
     "hypotheses": frozenset({"causal", "evidence_refs"}),
     "candidates": frozenset({
         "subgraph_replacement", "effects", "costs", "risks", "constraints",
@@ -499,14 +499,16 @@ class LocalSqlitePersistence:
         self._exec(
             "INSERT INTO evidence (id, workspace_id, system_id, kind, status, "
             "provenance, timestamp, source_revision, related_system_state, "
-            "confidence, artifact_ref, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "confidence, artifact_ref, created_at, result) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (evidence_id, workspace_id, payload.get("systemId"),
              payload["kind"], payload["status"],
              json.dumps(payload["provenance"], sort_keys=True),
              payload.get("timestamp"), payload.get("sourceRevision"),
              payload.get("relatedSystemState"), payload.get("confidence"),
-             payload.get("artifactRef"), payload["createdAt"]),
+             payload.get("artifactRef"), payload["createdAt"],
+             json.dumps(payload["result"], sort_keys=True)
+             if payload.get("result") is not None else None),
         )
         row = self._fetchone("SELECT * FROM evidence WHERE id = ?", (evidence_id,))
         assert row is not None

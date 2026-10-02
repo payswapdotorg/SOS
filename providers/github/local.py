@@ -18,19 +18,19 @@ FIXTURE_REPO_URL = "https://github.com/sos-demo/example-api"
 # Deterministic fixture commits (stable 40-hex; content-derived).
 _FIXTURE_COMMITS: tuple[tuple[str, str, str, str], ...] = (
     (
-        hashlib.sha256(b"sos-fixture-commit-1").hexdigest(),
+        hashlib.sha1(b"sos-fixture-commit-1").hexdigest(),
         "Initial service skeleton: API layer, SQLite store, background worker",
         "2026-01-12T09:15:00Z",
         "fixture-author@sos.demo",
     ),
     (
-        hashlib.sha256(b"sos-fixture-commit-2").hexdigest(),
+        hashlib.sha1(b"sos-fixture-commit-2").hexdigest(),
         "Add caching layer in front of the query path",
         "2026-02-03T14:40:00Z",
         "fixture-author@sos.demo",
     ),
     (
-        hashlib.sha256(b"sos-fixture-commit-3").hexdigest(),
+        hashlib.sha1(b"sos-fixture-commit-3").hexdigest(),
         "Harden worker retry policy and pin dependency versions",
         "2026-03-21T11:05:00Z",
         "fixture-author@sos.demo",
