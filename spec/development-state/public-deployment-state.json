@@ -53,20 +53,21 @@
       "reviewRecord": "PR #24 COMMENT id 5947787903 (TL fresh matrix at exact head 67df5eb: 80 bun tests / lint+typecheck clean / 606 pytest / compileall clean / gate 12/12; TL reconciliation commit 0b56b43 landed on the PR per the review protocol)"
     },
     "PUB-03": {
-      "status": "WAITING_FOR_ARCHITECT",
+      "status": "MERGED",
       "owner": "Worker C",
       "dependencies": [
         "PUB-00"
       ],
       "base": "7a3b1eb29df0c67cdc54dc4182e7911eefd52891",
       "session": "pub-03-freetier-infra",
-      "sessionChat": "https://chat.z.ai/c/939f1bb0-48f4-4e99-9051-012544789c13",
+      "sessionChat": "https://chat.z.ai/c/47141011-ab75-4161-b92b-6c7cc5b02a0b",
       "dispatchedAt": "2026-10-02T02:51:52Z",
       "pr": 26,
       "branch": "work/pub-03-freetier-infra",
       "branchHead": "126e6ef2f34459ea4a5bb8e656b1153f59a01d24",
       "implementationHead": "126e6ef2f34459ea4a5bb8e656b1153f59a01d24",
-      "note": "Review-ready at PR #26. Base updated to the re-dispatch base 7a3b1eb (live merged main incl. PUB-01+PUB-02 merges). Delivered: final infra/render.yaml (verified build/start commands), infra/vercel/ config + runbook, idempotent Neon/Upstash/R2 setup scripts + runbooks (offline selftests/dry-runs green; live paths operator-input), additive environment.example names, NEW .github/workflows/pub.yml §G matrix on overlay-root PRs (tests workflow byte-untouched), deployment runbook Stage A-C with operator-held credential inputs, preview-environments + ci-gates docs, Apify actor skeleton (NO Dockerfile — PUB-08). Gate matrix at implementation head 126e6ef: pytest 605/606 (the pre-disclosed env-drift OpenAPI digest finding ONLY — identical failure reproduced at pristine base 7a3b1eb in a clean worktree; OPENAPI_SNAPSHOT_SHA256 NOT changed per instruction; fastapi 0.142.2/pydantic 2.13.5), compileall clean, final_gate_check full 10/12 (G06+G11 = the same known test) / check-only PASS 11/12 exit 0, web gates green (lint/typecheck/80 bun tests). Checkpoint: spec/development-state/PUB-03-checkpoint.md. The checkpoint/state commit that follows the implementation head is the final branch tip (adds only checkpoint + this status record — no code). No unmerged sibling dependency, no frozen surface touched, no merge performed."
+      "mergedAs": "b3890180b6598200e545c72017d8ace1f6071424",
+      "reviewRecord": "PR #26 COMMENT id 5961068861 (TL fresh matrix at exact head e362b871: 605/606 pytest — the pre-disclosed env-drift digest finding ONLY, identical at pristine base; compileall clean; gate full 10/12 / check-only PASS 11/12; web lint+typecheck clean, 80/80 bun tests; allowed surface exact, frozen surface 0, token scan clean; CI web gates success + frozen tests workflow success, python gates G06-only known drift)"
     },
     "PUB-04": {
       "status": "PENDING",
@@ -147,19 +148,19 @@
     }
   },
   "currentFrontier": [
-    "PUB-01",
-    "PUB-02",
-    "PUB-03"
+    "PUB-04",
+    "PUB-05",
+    "PUB-07"
   ],
-  "currentTask": "PUB-01 | PUB-02 | PUB-03 (wave-1 in flight; three parallel agent sessions)",
+  "currentTask": "PUB-04 | PUB-05 | PUB-07 (wave-2 dispatch ready; packets staged, base = live main b389018)",
   "notes": [
     "Program authorized by the operator directive recorded verbatim in spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md (received 2026-10-02 in the operator's authenticated session channel).",
     "The frozen W0-W15 artifacts stay authoritative and untouched: implementation-state.json remains ROADMAP_COMPLETE with currentFrontier=[] and currentTask=null; all PUB progress is recorded ONLY in this file.",
-    "Gate matrix binding for every PUB merge (contract \u00a7G): python3 -m pytest (hermetic); python3 -m compileall -q src tests services providers execution; python3 tools/final_gate_check.py (12/12, overlay-scoped G09 per contract \u00a7D PUB-01); apps/web bun lint/typecheck/test (from PUB-02).",
-    "Clone protocol: fresh clones must fetch all remote heads (git fetch origin '+refs/heads/*:refs/remotes/origin/*') \u2014 the W15 gate resolves the W0-W15 lineage including W1/W2 squash-era PR heads on work/* branches (CI precedent a956325).",
+    "Gate matrix binding for every PUB merge (contract §G): python3 -m pytest (hermetic); python3 -m compileall -q src tests services providers execution; python3 tools/final_gate_check.py (12/12, overlay-scoped G09 per contract §D PUB-01); apps/web bun lint/typecheck/test (from PUB-02).",
+    "Clone protocol: fresh clones must fetch all remote heads (git fetch origin '+refs/heads/*:refs/remotes/origin/*') — the W15 gate resolves the W0-W15 lineage including W1/W2 squash-era PR heads on work/* branches (CI precedent a956325).",
     "Anti-fabrication: a completion claim is valid only with the exact branch head fetchable on the remote (remote-ref truth gate; W14 incident precedent). The TL re-runs every gate fresh at the exact reviewed head.",
     "Worker dispatches are created through the operator's replay agents-tab discipline (GLM-5.3, Full-Stack, detached). Worker prompts embed the full binding contract text (zero-history rule).",
-    "PUB-01's first commit is the disclosed G09 overlay-prefix reconciliation (tools/final_gate_check.py + tests/test_w15_final_gate_check.py ONLY as specified in contract \u00a7D PUB-01; precedent class 69c822f/a956325). No other gate logic may change in any PUB item.",
+    "PUB-01's first commit is the disclosed G09 overlay-prefix reconciliation (tools/final_gate_check.py + tests/test_w15_final_gate_check.py ONLY as specified in contract §D PUB-01; precedent class 69c822f/a956325). No other gate logic may change in any PUB item.",
     "External credential state: operator GitHub PAT PROVIDED 2026-10-02 in the authenticated session channel (validated: login payswapdotorg, full scopes, push access to this repo); held in the TL environment only, substituted at worker-dispatch send time, never persisted in Git. Composio API keys (COMPOSIO_API_KEY / COMPOSIO_MCP_API_KEY) provided same channel for app integrations. PUBLIC-stage deploys (PUB-11/12) additionally need operator-held Vercel/Render/Neon/Upstash/R2/Apify account connections."
   ]
 }
