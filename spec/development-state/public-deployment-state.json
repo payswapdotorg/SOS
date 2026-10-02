@@ -20,11 +20,22 @@
       "note": "Merged as ad3bf5c (PR #23, merge commit). Remote-ref truth gate passed (branch head aefa3e5 fetchable); TL re-ran the full gate matrix at the exact head: 551 passed / compileall clean / final gate OVERALL PASS. COMMENT-form TL review record posted on PR #23 (id 5944683909)."
     },
     "PUB-01": {
-      "status": "PENDING",
+      "status": "MERGED",
       "owner": "Worker A",
       "dependencies": [
         "PUB-00"
-      ]
+      ],
+      "base": "7b1adb4",
+      "session": "pub-01-fastapi-adapter",
+      "sessionChat": "https://chat.z.ai/c/b9d762e8-306e-49de-8806-1e05f9d8e0fd",
+      "dispatchedAt": "2026-10-02T02:50:39Z",
+      "pr": 25,
+      "branch": "work/pub-01-fastapi-adapter",
+      "branchHead": "5a24c4717dd0fe5d2113620d4e6bc7d8698299b8",
+      "note": "Merged as c98972a (PR #25, merge commit). Remote-ref truth gate passed (exact head 5a24c47 fetchable); TL re-ran the full gate matrix at the exact head: 606 passed / compileall clean / final gate 12/12 PASS; FastAPI LOCAL boot smoke: truthful per-component health + OpenAPI served (29 /api/v1 paths). G09 = frozen surface clean + governed overlay prefixes (apps/ services/ providers/ execution/ db/ infra/ docs/deployment/ spec/deployment/) accepted, prefix-scoped only. Secret scan clean; frozen src/sos untouched. Checkpoint: spec/development-state/PUB-01-checkpoint.md.",
+      "mergedAs": "c98972adf79eae57e9438f6408e27f41165ebc0b",
+      "implementationHead": "79a76e047ce332d0abc4346c9756f0a8ac9faa3c",
+      "reviewRecord": "PR #25 COMMENT id 5947580162 (TL fresh matrix at exact head 5a24c47: 606 passed / compileall clean / final gate 12/12 / FastAPI boot smoke truthful health + OpenAPI 3.1.0)"
     },
     "PUB-02": {
       "status": "WAITING_FOR_ARCHITECT",
@@ -36,14 +47,18 @@
       "pr": 24,
       "baseSha": "7b1adb4a6461565d54d689a05bda159474646966",
       "implementationHead": "53cf06c777820d57526b40bc53dd25cf5a50fda7",
-      "note": "apps/web Next.js 16 App Router + TypeScript cockpit: typed /api/v1 client (contract \u00a7C mirror, relative URLs, NEXT_PUBLIC_API_BASE env, fixture/demo mode), full directive \u00a75 surfaces, Journey-1 demo fixtures, 59 bun tests green + lint/typecheck clean; python suite 551 passed at the head (frozen surface untouched). Built against the CONTRACT + fixtures only (no unmerged sibling dependency)."
+      "note": "apps/web Next.js 16 App Router + TypeScript cockpit: typed /api/v1 client (contract \u00a7C mirror, relative URLs, NEXT_PUBLIC_API_BASE env, fixture/demo mode), full directive \u00a75 surfaces, Journey-1 demo fixtures, 59 bun tests green + lint/typecheck clean; python suite 551 passed at the head (frozen surface untouched). Built against the CONTRACT + fixtures only (no unmerged sibling dependency). TL reconciliation landed on the branch (commit 0b56b43): client aligned to the PUB-01 OpenAPI (workspaceId/candidateId params; /audit + /architecture + single-revision paths retired in favor of workspace-detail recentActivity, currentRevision.graph, collection narrowing; frozen W3 graph vocabulary 1:1; wire-shape Uncertainty/SourceRef/RecoveryInfo); 80 bun tests / lint / typecheck green at the reconciled head."
     },
     "PUB-03": {
-      "status": "PENDING",
+      "status": "DISPATCHED",
       "owner": "Worker C",
       "dependencies": [
         "PUB-00"
-      ]
+      ],
+      "base": "7b1adb4",
+      "session": "pub-03-freetier-infra",
+      "sessionChat": "https://chat.z.ai/c/939f1bb0-48f4-4e99-9051-012544789c13",
+      "dispatchedAt": "2026-10-02T02:51:52Z"
     },
     "PUB-04": {
       "status": "PENDING",
@@ -128,7 +143,7 @@
     "PUB-02",
     "PUB-03"
   ],
-  "currentTask": "PUB-01 (Worker A) | PUB-02 (Worker B) | PUB-03 (Worker C) \u2014 wave-1 parallel dispatch",
+  "currentTask": "PUB-01 | PUB-02 | PUB-03 (wave-1 in flight; three parallel agent sessions)",
   "notes": [
     "Program authorized by the operator directive recorded verbatim in spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md (received 2026-10-02 in the operator's authenticated session channel).",
     "The frozen W0-W15 artifacts stay authoritative and untouched: implementation-state.json remains ROADMAP_COMPLETE with currentFrontier=[] and currentTask=null; all PUB progress is recorded ONLY in this file.",

@@ -1209,6 +1209,50 @@ def test_g09_detects_deployment_artifact(tmp_path: Path) -> None:
     assert "k8s/manifest.yaml" in result.details
 
 
+def test_g09_overlay_prefix_exempts_governed_overlay_paths(
+    tmp_path: Path,
+) -> None:
+    """PUB-01 G09 overlay-prefix reconciliation: deployment-shaped paths
+    INSIDE the governed overlay roots (db/migrations/, the future Apify actor
+    Dockerfile, ...) are exempt by design — the contract §D PUB-01 allowlist
+    (spec/deployment/PUBLIC-DEPLOYMENT-CONTRACT.md) governs them instead."""
+    root = tmp_path / "repo"
+    baseline = build_fixture(root)
+    overlay_paths = (
+        root / "db" / "migrations" / "0001_init.sql",
+        root / "db" / "migrations" / "0002_jobs.sql",
+        root / "infra" / "apify" / "Dockerfile",
+        root / "services" / "api" / "docker-compose.yml",
+    )
+    for path in overlay_paths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("-- overlay fixture\n", encoding="utf-8")
+    results = run_checks(root, baseline)
+    assert results["G09"].status == fgc.STATUS_PASS
+    assert "frozen surface of the repository tree" in results["G09"].details
+    assert (
+        "governed by "
+        "spec/deployment/PUBLIC-DEPLOYMENT-CONTRACT.md" in results["G09"].details
+    )
+
+
+def test_g09_overlay_prefix_scoping_is_exact(tmp_path: Path) -> None:
+    """A pattern-matching path OUTSIDE the overlay prefixes still fails G09 —
+    the exemption is prefix-scoped (no global relaxation), and a
+    deceptively-named non-prefix path (e.g. ``dbx/`` vs ``db/``) is caught."""
+    root = tmp_path / "repo"
+    baseline = build_fixture(root)
+    exempt = root / "db" / "migrations" / "0001_init.sql"
+    exempt.parent.mkdir(parents=True)
+    exempt.write_text("-- overlay fixture\n", encoding="utf-8")
+    intruder = root / "dbx" / "migrations" / "evil.sql"
+    intruder.parent.mkdir(parents=True)
+    intruder.write_text("-- frozen-surface intrusion\n", encoding="utf-8")
+    result = assert_targeted(run_checks(root, baseline), "G09")
+    assert "dbx/migrations/evil.sql" in result.details
+    assert "db/migrations/0001_init.sql" not in result.details
+
+
 # ---------------------------------------------------------------------------
 # G10 — docs reconciled
 # ---------------------------------------------------------------------------
