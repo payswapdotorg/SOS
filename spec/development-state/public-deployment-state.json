@@ -1,0 +1,133 @@
+{
+  "schemaVersion": "1.0",
+  "program": "SOS-PUBLIC-DEPLOYMENT",
+  "directive": "spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md",
+  "contract": "spec/deployment/PUBLIC-DEPLOYMENT-CONTRACT.md",
+  "baseline": {
+    "frozenRoadmapStatus": "ROADMAP_COMPLETE (W0-W15, implementation-state.json, untouched)",
+    "baselineMain": "ddc88a680993d9c3f00638419d7da20458fc0651",
+    "baselineVerification": "TL fresh full-clone re-run 2026-10-02: pytest 551 passed; compileall clean; tools/final_gate_check.py OVERALL PASS 12/12 (exit 0)"
+  },
+  "status": "OPEN",
+  "tasks": {
+    "PUB-00": {
+      "status": "DISPATCHED",
+      "owner": "TL",
+      "dependencies": [],
+      "mergedAs": null,
+      "note": "Contract artifacts authored (9 files, +2649 lines); gate matrix green at every revision through the final authored head (551 passed / compileall clean / gate 12/12). Operator GitHub PAT provided 2026-10-02 in the authenticated session channel — push and merge unblocked; the PAT is substituted at send time from the TL environment and is never persisted in Git."
+    },
+    "PUB-01": {
+      "status": "PENDING",
+      "owner": "Worker A",
+      "dependencies": [
+        "PUB-00"
+      ]
+    },
+    "PUB-02": {
+      "status": "PENDING",
+      "owner": "Worker B",
+      "dependencies": [
+        "PUB-00"
+      ]
+    },
+    "PUB-03": {
+      "status": "PENDING",
+      "owner": "Worker C",
+      "dependencies": [
+        "PUB-00"
+      ]
+    },
+    "PUB-04": {
+      "status": "PENDING",
+      "owner": "Worker B",
+      "dependencies": [
+        "PUB-01",
+        "PUB-02"
+      ]
+    },
+    "PUB-05": {
+      "status": "PENDING",
+      "owner": "Worker A",
+      "dependencies": [
+        "PUB-01"
+      ]
+    },
+    "PUB-06": {
+      "status": "PENDING",
+      "owner": "Worker A",
+      "dependencies": [
+        "PUB-01",
+        "PUB-05"
+      ]
+    },
+    "PUB-07": {
+      "status": "PENDING",
+      "owner": "Worker C",
+      "dependencies": [
+        "PUB-01"
+      ]
+    },
+    "PUB-08": {
+      "status": "PENDING",
+      "owner": "Worker C",
+      "dependencies": [
+        "PUB-06",
+        "PUB-07"
+      ]
+    },
+    "PUB-09": {
+      "status": "PENDING",
+      "owner": "TL (A+B+C contributions)",
+      "dependencies": [
+        "PUB-04",
+        "PUB-05",
+        "PUB-06",
+        "PUB-07",
+        "PUB-08"
+      ]
+    },
+    "PUB-10": {
+      "status": "PENDING",
+      "owner": "Worker C + independent review",
+      "dependencies": [
+        "PUB-09"
+      ]
+    },
+    "PUB-11": {
+      "status": "PENDING",
+      "owner": "TL + operator inputs",
+      "dependencies": [
+        "PUB-10"
+      ]
+    },
+    "PUB-12": {
+      "status": "PENDING",
+      "owner": "TL + operator inputs",
+      "dependencies": [
+        "PUB-11"
+      ]
+    },
+    "PUB-13": {
+      "status": "PENDING",
+      "owner": "TL + independent Architect review",
+      "dependencies": [
+        "PUB-12"
+      ]
+    }
+  },
+  "currentFrontier": [
+    "PUB-00"
+  ],
+  "currentTask": "PUB-00",
+  "notes": [
+    "Program authorized by the operator directive recorded verbatim in spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md (received 2026-10-02 in the operator's authenticated session channel).",
+    "The frozen W0-W15 artifacts stay authoritative and untouched: implementation-state.json remains ROADMAP_COMPLETE with currentFrontier=[] and currentTask=null; all PUB progress is recorded ONLY in this file.",
+    "Gate matrix binding for every PUB merge (contract §G): python3 -m pytest (hermetic); python3 -m compileall -q src tests services providers execution; python3 tools/final_gate_check.py (12/12, overlay-scoped G09 per contract §D PUB-01); apps/web bun lint/typecheck/test (from PUB-02).",
+    "Clone protocol: fresh clones must fetch all remote heads (git fetch origin '+refs/heads/*:refs/remotes/origin/*') — the W15 gate resolves the W0-W15 lineage including W1/W2 squash-era PR heads on work/* branches (CI precedent a956325).",
+    "Anti-fabrication: a completion claim is valid only with the exact branch head fetchable on the remote (remote-ref truth gate; W14 incident precedent). The TL re-runs every gate fresh at the exact reviewed head.",
+    "Worker dispatches are created through the operator's replay agents-tab discipline (GLM-5.3, Full-Stack, detached). Worker prompts embed the full binding contract text (zero-history rule).",
+    "PUB-01's first commit is the disclosed G09 overlay-prefix reconciliation (tools/final_gate_check.py + tests/test_w15_final_gate_check.py ONLY as specified in contract §D PUB-01; precedent class 69c822f/a956325). No other gate logic may change in any PUB item.",
+    "External input blocker (standing until provided): operator GitHub PAT for push/merge operations to payswapdotorg/SOS (send-time substitution, never persisted in Git). PUBLIC-stage deploys additionally need operator-held Vercel/Render/Neon/Upstash/R2/Apify accounts and credentials."
+  ]
+}

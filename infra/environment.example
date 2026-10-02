@@ -1,0 +1,77 @@
+# SOS Public Deployment — environment variable contract
+#
+# PUB-00. Naming authority for ALL environment variables in the overlay.
+# Values below are PLACEHOLDERS/defaults only — NEVER put real secrets in Git
+# (security gate S2). Cloud credentials are operator-held and injected at the
+# provider dashboards (Render/Vercel env settings) or CI secrets.
+# LOCAL mode requires ZERO of the secret variables.
+
+# ---------------------------------------------------------------------------
+# Core mode switches (provider-neutral; code never branches on provider
+# identity beyond the adapter interface)
+# ---------------------------------------------------------------------------
+SOS_ENV=local                  # local | preview | public
+SOS_PERSISTENCE=local          # local (SQLite) | neon (PostgreSQL)
+SOS_COORDINATION=local         # local (in-process) | upstash (Redis)
+SOS_ARTIFACTS=local            # local (filesystem) | r2 (S3-compatible)
+SOS_EXECUTION=demo             # demo (DemoProvider) | apify (bounded jobs)
+
+# ---------------------------------------------------------------------------
+# URLs (public/preview deployments)
+# ---------------------------------------------------------------------------
+SOS_API_BASE_URL=              # e.g. https://sos-api.onrender.com
+SOS_WEB_BASE_URL=              # e.g. https://sos.vercel.app
+
+# ---------------------------------------------------------------------------
+# Persistence (Neon) — required only when SOS_PERSISTENCE=neon
+# ---------------------------------------------------------------------------
+SOS_DATABASE_URL=              # postgresql+asyncpg://… (Neon PUBLIC branch)
+
+# ---------------------------------------------------------------------------
+# Coordination (Upstash Redis) — required only when SOS_COORDINATION=upstash
+# ---------------------------------------------------------------------------
+SOS_REDIS_URL=                 # rediss://…:6379 (Upstash)
+
+# ---------------------------------------------------------------------------
+# Artifacts (Cloudflare R2) — required only when SOS_ARTIFACTS=r2
+# ---------------------------------------------------------------------------
+SOS_R2_ENDPOINT=               # https://<account>.r2.cloudflarestorage.com
+SOS_R2_ACCESS_KEY_ID=
+SOS_R2_SECRET_ACCESS_KEY=
+SOS_R2_BUCKET=                 # private bucket (security gate S3)
+
+# ---------------------------------------------------------------------------
+# Execution (Apify) — required only when SOS_EXECUTION=apify
+# ---------------------------------------------------------------------------
+SOS_APIFY_TOKEN=
+SOS_APIFY_ACTOR_ID=            # the bounded execution/ingestion actor (PUB-08)
+
+# ---------------------------------------------------------------------------
+# Auth (GitHub OAuth) — required for real auth in preview/public (PUB-04)
+# LOCAL mode uses the deterministic fake-GitHub provider instead.
+# ---------------------------------------------------------------------------
+SOS_GITHUB_CLIENT_ID=
+SOS_GITHUB_CLIENT_SECRET=
+SOS_SESSION_SECRET=            # 32+ random bytes; sessions fail closed without it
+
+# ---------------------------------------------------------------------------
+# Job callbacks (provider → API signed callbacks, PUB-06/PUB-08)
+# ---------------------------------------------------------------------------
+SOS_JOB_CALLBACK_SECRET=       # HMAC secret for callback envelopes
+
+# ---------------------------------------------------------------------------
+# GitHub source adapter (brownfield onboarding; optional read-scope PAT)
+# ---------------------------------------------------------------------------
+SOS_GITHUB_SOURCE_PAT=
+
+# ---------------------------------------------------------------------------
+# Rate limits (directive §13 buckets; LOCAL defaults shown)
+# ---------------------------------------------------------------------------
+SOS_RATE_ANON_PER_MIN=60          # anonymous: demo reads only
+SOS_RATE_USER_PER_MIN=240         # authenticated normal reads
+SOS_RATE_WRITE_PER_MIN=30         # authenticated bounded writes
+SOS_RATE_JOB_PER_HOUR=10          # expensive job quota per workspace
+SOS_RATE_RECOVERY_PER_HOUR=2      # repository recovery jobs per workspace
+SOS_RATE_ARTIFACT_MAX_MB=50       # artifact upload size cap (S15)
+SOS_RATE_BODY_MAX_MB=1            # request payload cap (S16)
+SOS_APIFY_MAX_CONCURRENT=2        # Apify low-concurrency semaphore (S14)
