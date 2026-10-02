@@ -20,7 +20,7 @@
       "note": "Merged as ad3bf5c (PR #23, merge commit). Remote-ref truth gate passed (branch head aefa3e5 fetchable); TL re-ran the full gate matrix at the exact head: 551 passed / compileall clean / final gate OVERALL PASS. COMMENT-form TL review record posted on PR #23 (id 5944683909)."
     },
     "PUB-01": {
-      "status": "WAITING_FOR_ARCHITECT",
+      "status": "MERGED",
       "owner": "Worker A",
       "dependencies": [
         "PUB-00"
@@ -31,8 +31,11 @@
       "dispatchedAt": "2026-10-02T02:50:39Z",
       "pr": 25,
       "branch": "work/pub-01-fastapi-adapter",
-      "branchHead": "79a76e047ce332d0abc4346c9756f0a8ac9faa3c",
-      "note": "Review-ready (PR #25): FastAPI control-plane adapter on LOCAL provider seams; G09 overlay-prefix reconciliation landed as the standalone first commit (ea84ed2); 606 tests passed / compileall clean / final gate 12/12 at the implementation head; frozen surface untouched; no merge performed. Checkpoint: spec/development-state/PUB-01-checkpoint.md."
+      "branchHead": "5a24c4717dd0fe5d2113620d4e6bc7d8698299b8",
+      "note": "Merged as c98972a (PR #25, merge commit). Remote-ref truth gate passed (exact head 5a24c47 fetchable); TL re-ran the full gate matrix at the exact head: 606 passed / compileall clean / final gate 12/12 PASS; FastAPI LOCAL boot smoke: truthful per-component health + OpenAPI served (29 /api/v1 paths). G09 = frozen surface clean + governed overlay prefixes (apps/ services/ providers/ execution/ db/ infra/ docs/deployment/ spec/deployment/) accepted, prefix-scoped only. Secret scan clean; frozen src/sos untouched. Checkpoint: spec/development-state/PUB-01-checkpoint.md.",
+      "mergedAs": "c98972adf79eae57e9438f6408e27f41165ebc0b",
+      "implementationHead": "79a76e047ce332d0abc4346c9756f0a8ac9faa3c",
+      "reviewRecord": "PR #25 COMMENT id 5947580162 (TL fresh matrix at exact head 5a24c47: 606 passed / compileall clean / final gate 12/12 / FastAPI boot smoke truthful health + OpenAPI 3.1.0)"
     },
     "PUB-02": {
       "status": "DISPATCHED",
