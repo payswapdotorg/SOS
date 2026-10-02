@@ -75,3 +75,11 @@ SOS_RATE_RECOVERY_PER_HOUR=2      # repository recovery jobs per workspace
 SOS_RATE_ARTIFACT_MAX_MB=50       # artifact upload size cap (S15)
 SOS_RATE_BODY_MAX_MB=1            # request payload cap (S16)
 SOS_APIFY_MAX_CONCURRENT=2        # Apify low-concurrency semaphore (S14)
+
+# ---------------------------------------------------------------------------
+# LOCAL-mode state locations (PUB-01 additive names; defaults live OUTSIDE
+# the repository tree in the platform temp dir so runtime state never lands
+# in the governed source tree — G09-safe by construction)
+# ---------------------------------------------------------------------------
+SOS_LOCAL_DB_PATH=                # LOCAL SQLite database file
+SOS_LOCAL_ARTIFACTS_DIR=          # LOCAL content-addressed artifact store root

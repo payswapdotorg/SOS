@@ -9,6 +9,7 @@ at ``providers/github/fixtures/demo-repo``.
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 from .seam import BranchInfo, CommitInfo, RepositoryInfo, SeamHealth
 
@@ -122,6 +123,22 @@ class LocalFixtureGitHubSource:
         if not commits:
             raise UnknownCommitError(f"commit '{sha}' not in fixture set")
         return commits[0]
+
+    def repository_root(self, url: str) -> str:
+        self.resolve_repository(url)
+        return str(Path(__file__).resolve().parent / "fixtures" / "demo-repo")
+
+    def resolve_ref(self, url: str, ref: str) -> CommitInfo:
+        """Pin a branch/tag/SHA to the EXACT commit (never "latest main")."""
+        if ref in {sha for sha, *_ in _FIXTURE_COMMITS}:
+            return self.get_commit(url, ref)
+        branches = self.list_branches(url)
+        for branch in branches:
+            if branch.name == ref:
+                return self.get_commit(url, branch.head_sha)
+        raise UnknownCommitError(
+            f"ref '{ref}' is not present in the LOCAL fixture repository"
+        )
 
     @staticmethod
     def fixture_commits() -> tuple[CommitInfo, ...]:

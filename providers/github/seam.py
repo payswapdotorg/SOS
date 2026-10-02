@@ -50,3 +50,13 @@ class GitHubSourcePort(Protocol):
                      limit: int) -> tuple[CommitInfo, ...]: ...
 
     def get_commit(self, url: str, sha: str) -> CommitInfo: ...
+
+    def repository_root(self, url: str) -> str:
+        """The local filesystem root for architecture recovery.
+
+        LOCAL mode returns the fixture tree; the cloud adapter materializes
+        the pinned revision (PUB-04+) — recovery NEVER trusts a mutable
+        working copy."""
+
+    def resolve_ref(self, url: str, ref: str) -> CommitInfo:
+        """Resolve a branch/tag/SHA reference to the EXACT pinned commit."""

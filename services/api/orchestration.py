@@ -590,3 +590,164 @@ def _dejsonable(value: Any) -> Any:
 
 def content_hash(parts: tuple[str, ...]) -> str:
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+# ---------------------------------------------------------------------------
+# Route-facing orchestration flows (thin routes call THESE; they import sos.*)
+# ---------------------------------------------------------------------------
+
+
+def validate_mission_journey(
+    *,
+    goals: list[str],
+    outcomes: list[str],
+    stakeholders: list[str],
+    measures: list[str],
+    constraints: list[str],
+    preferences: list[str],
+) -> None:
+    """Validate mission journey fields through the W1 domain authority.
+
+    Constructs the frozen ``sos.model.Mission`` (validation runs at
+    construction) — the mission model is the single authority for what a
+    lawful mission journey carries; the route only maps fields.
+    """
+    from sos.model import Mission, MissionStatus
+
+    Mission(
+        id="wire-validation",
+        version=1,
+        authority="mission-owner",
+        statement="wire mission journey validation",
+        goals=tuple(goals),
+        desired_outcomes=tuple(outcomes),
+        stakeholders=tuple(stakeholders),
+        measures=tuple(measures),
+        assumptions=(),
+        ambiguities=(),
+        status=MissionStatus.DRAFT,
+        parent_version=None,
+        history=(),
+        traceability=DEMO_TRACEABILITY,
+    )
+
+
+def run_system_recovery(
+    *,
+    github: Any,
+    repository_url: str,
+    ref: str | None,
+    fallback_revision: str | None,
+    traceability: Traceability,
+) -> tuple[Any, Any, Any]:
+    """Pin the exact revision via the GitHub seam, then run the REAL W3
+    recovery pipeline. Returns (commit, recovery_result, system_state).
+
+    The repository root comes from the seam (LOCAL: the fixture tree;
+    PUB-04+: the materialized pinned revision)."""
+    commit = (
+        github.resolve_ref(repository_url, ref)
+        if ref
+        else github.get_commit(repository_url, fallback_revision or "")
+    )
+    root = github.repository_root(repository_url)
+    from sos.recovery import recover_repository as _recover
+
+    recovery = _recover(root=root, revision=commit.sha,
+                        traceability=traceability)
+    return commit, recovery, recovery.system_state
+
+
+def dispatch_experiment_execution(
+    *,
+    providers: dict[str, Any],
+    decisions_rows: list[dict[str, Any]],
+    assurance_rows: list[dict[str, Any]],
+    experiment_rows: list[dict[str, Any]],
+    experiment_id: str,
+    intent: str,
+    decision_id: str | None,
+    provider_id: str,
+) -> tuple[ExecutionReceipt, dict[str, Any]]:
+    """Build + submit the W11 request for one experiment through the
+    substrate (all authority gates enforced BEFORE any provider call).
+
+    Returns (receipt, decision_row_used). Raises ExecutionContractError when
+    the governed chain rejects (the route maps it to the error envelope)."""
+    experiment_row = next(
+        (r for r in experiment_rows if r["id"] == experiment_id), None
+    )
+    if experiment_row is None:
+        raise LookupError(f"experiment '{experiment_id}' not found")
+    experiment = experiment_row_to_domain(experiment_row)
+
+    decision_row = None
+    if decision_id:
+        decision_row = next(
+            (r for r in decisions_rows if r["id"] == decision_id), None
+        )
+    else:
+        for row in decisions_rows:
+            snap = row["authority_snapshot"]
+            if (
+                snap.get("experimentId") == experiment_id
+                and snap.get("autonomyState") == "ACT"
+            ):
+                decision_row = row
+                break
+    if decision_row is None:
+        raise LookupError(
+            f"no ACT-autonomy decision bound to experiment '{experiment_id}'"
+        )
+    decision = decision_row_to_autonomy(decision_row)
+
+    assurance_row = next(
+        (r for r in assurance_rows
+         if r["id"] == experiment.assurance_result_id),
+        None,
+    )
+    if assurance_row is None:
+        raise LookupError(
+            f"assurance '{experiment.assurance_result_id}' not found"
+        )
+    assurance = assurance_row_to_result(assurance_row)
+
+    rollback_ref = experiment_row["events"]["domain"]["rollbackRef"]
+    # The governed rollback reference must carry recovery evidence ids
+    # (W11): bind the assurance's rollback evidence, falling back to the
+    # authorizing decision's evidence refs.
+    rollback_evidence = (
+        assurance.reversibility.rollback_evidence_ids
+        if assurance.reversibility.rollback_evidence_ids
+        else tuple(decision_row["evidence_refs"])
+    )
+    if not rollback_evidence:
+        raise LookupError(
+            "no recovery evidence bound to the experiment's rollback path"
+        )
+    request = build_execution_request(
+        intent=intent or f"Governed execution of experiment {experiment_id}",
+        provider_id=provider_id,
+        source_revision=experiment.provenance_revision,
+        provenance_revision=experiment.provenance_revision,
+        base_graph_id=experiment.base_graph_id,
+        base_graph_revision=experiment.base_graph_revision,
+        environment="local",
+        w9_decision_id=decision.id,
+        w7_assurance_id=assurance.id,
+        w8_experiment_id=experiment.id,
+        rollback_reference={
+            "reference": rollback_ref,
+            "evidenceIds": list(rollback_evidence),
+            "detail": "governed rollback path bound to the experiment",
+        },
+        traceability=decision.traceability,
+    )
+    receipt = submit_governed_execution(
+        providers=providers,
+        known_decisions={decision.id: decision},
+        known_assurance={assurance.id: assurance},
+        known_experiments={experiment.id: experiment},
+        request=request,
+    )
+    return receipt, decision_row

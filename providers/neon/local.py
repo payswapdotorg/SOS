@@ -330,7 +330,7 @@ class LocalSqlitePersistence:
 
     def get_mission(self, scope: TenantScope, mission_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT m.* FROM missions m WHERE m.id = ? AND " + self._scope_clause("missions", scope)[0],
+            "SELECT * FROM missions WHERE missions.id = ? AND " + self._scope_clause("missions", scope)[0],
             (mission_id,) + self._scope_clause("missions", scope)[1],
         )
         return self._row_to_dict("missions", row) if row else None
@@ -361,7 +361,7 @@ class LocalSqlitePersistence:
     def get_mission_revision(self, scope: TenantScope,
                              revision_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT r.* FROM mission_revisions r WHERE r.id = ? AND "
+            "SELECT * FROM mission_revisions WHERE mission_revisions.id = ? AND "
             + self._scope_clause("mission_revisions", scope)[0],
             (revision_id,) + self._scope_clause("mission_revisions", scope)[1],
         )
@@ -407,7 +407,7 @@ class LocalSqlitePersistence:
 
     def get_system(self, scope: TenantScope, system_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT s.* FROM systems s WHERE s.id = ? AND "
+            "SELECT * FROM systems WHERE systems.id = ? AND "
             + self._scope_clause("systems", scope)[0],
             (system_id,) + self._scope_clause("systems", scope)[1],
         )
@@ -416,7 +416,7 @@ class LocalSqlitePersistence:
     def get_system_revision(self, scope: TenantScope,
                             revision_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT r.* FROM system_revisions r WHERE r.id = ? AND "
+            "SELECT * FROM system_revisions WHERE system_revisions.id = ? AND "
             + self._scope_clause("system_revisions", scope)[0],
             (revision_id,) + self._scope_clause("system_revisions", scope)[1],
         )
@@ -488,6 +488,14 @@ class LocalSqlitePersistence:
 
     def insert_evidence(self, *, workspace_id: str, evidence_id: str,
                         payload: dict[str, Any]) -> dict[str, Any]:
+        # Content-addressed evidence ids dedup identical ingestion (W4):
+        # an identical record already present is returned unchanged —
+        # identical evidence never duplicates.
+        existing = self._fetchone(
+            "SELECT * FROM evidence WHERE id = ?", (evidence_id,)
+        )
+        if existing is not None:
+            return self._row_to_dict("evidence", existing)
         self._exec(
             "INSERT INTO evidence (id, workspace_id, system_id, kind, status, "
             "provenance, timestamp, source_revision, related_system_state, "
@@ -565,7 +573,7 @@ class LocalSqlitePersistence:
     def get_candidate(self, scope: TenantScope,
                       candidate_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT c.* FROM candidates c WHERE c.id = ? AND "
+            "SELECT * FROM candidates WHERE candidates.id = ? AND "
             + self._scope_clause("candidates", scope)[0],
             (candidate_id,) + self._scope_clause("candidates", scope)[1],
         )
@@ -613,7 +621,7 @@ class LocalSqlitePersistence:
     def get_assurance(self, scope: TenantScope,
                       assurance_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT a.* FROM assurance_runs a WHERE a.id = ? AND "
+            "SELECT * FROM assurance_runs WHERE assurance_runs.id = ? AND "
             + self._scope_clause("assurance_runs", scope)[0],
             (assurance_id,) + self._scope_clause("assurance_runs", scope)[1],
         )
@@ -656,7 +664,7 @@ class LocalSqlitePersistence:
     def get_decision(self, scope: TenantScope,
                      decision_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT d.* FROM decisions d WHERE d.id = ? AND "
+            "SELECT * FROM decisions WHERE decisions.id = ? AND "
             + self._scope_clause("decisions", scope)[0],
             (decision_id,) + self._scope_clause("decisions", scope)[1],
         )
@@ -732,7 +740,7 @@ class LocalSqlitePersistence:
     def get_experiment(self, scope: TenantScope,
                        experiment_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT e.* FROM experiments e WHERE e.id = ? AND "
+            "SELECT * FROM experiments WHERE experiments.id = ? AND "
             + self._scope_clause("experiments", scope)[0],
             (experiment_id,) + self._scope_clause("experiments", scope)[1],
         )
@@ -758,6 +766,14 @@ class LocalSqlitePersistence:
 
     def insert_execution(self, *, workspace_id: str, execution_id: str,
                          payload: dict[str, Any]) -> dict[str, Any]:
+        # Content-addressed execution ids make re-dispatch of an IDENTICAL
+        # governed request idempotent (directive §8: retries never duplicate
+        # side effects): the existing row is returned unchanged.
+        existing = self._fetchone(
+            "SELECT * FROM executions WHERE id = ?", (execution_id,)
+        )
+        if existing is not None:
+            return self._row_to_dict("executions", existing)
         self._exec(
             "INSERT INTO executions (id, workspace_id, experiment_id, "
             "provider, request_hash, receipt, artifact_refs, status, "
@@ -776,7 +792,7 @@ class LocalSqlitePersistence:
     def get_execution(self, scope: TenantScope,
                       execution_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT x.* FROM executions x WHERE x.id = ? AND "
+            "SELECT * FROM executions WHERE executions.id = ? AND "
             + self._scope_clause("executions", scope)[0],
             (execution_id,) + self._scope_clause("executions", scope)[1],
         )
@@ -867,7 +883,7 @@ class LocalSqlitePersistence:
 
     def get_job(self, scope: TenantScope, job_id: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT j.* FROM jobs j WHERE j.id = ? AND "
+            "SELECT * FROM jobs WHERE jobs.id = ? AND "
             + self._scope_clause("jobs", scope)[0],
             (job_id,) + self._scope_clause("jobs", scope)[1],
         )
@@ -876,7 +892,7 @@ class LocalSqlitePersistence:
     def get_job_by_idempotency_key(self, scope: TenantScope,
                                    key: str) -> dict[str, Any] | None:
         row = self._fetchone(
-            "SELECT j.* FROM jobs j WHERE j.idempotency_key = ? AND "
+            "SELECT * FROM jobs WHERE jobs.idempotency_key = ? AND "
             + self._scope_clause("jobs", scope)[0],
             (key,) + self._scope_clause("jobs", scope)[1],
         )
@@ -933,6 +949,22 @@ class LocalSqlitePersistence:
     def append_audit(self, *, tenant_id: str, actor: str, action: str,
                      target: str, meta: dict[str, Any], ts: str,
                      audit_id: str) -> dict[str, Any]:
+        # Audit events are append-only: repeated identical events are
+        # distinct records, so a sequence suffix keeps the caller-supplied
+        # content id unique per write.
+        with self._lock:
+            clash = self._fetchone(
+                "SELECT id FROM audit_events WHERE id = ?", (audit_id,)
+            )
+            if clash is not None:
+                seq = 0
+                candidate = f"{audit_id}-{seq:04d}"
+                while self._fetchone(
+                    "SELECT id FROM audit_events WHERE id = ?", (candidate,)
+                ) is not None:
+                    seq += 1
+                    candidate = f"{audit_id}-{seq:04d}"
+                audit_id = candidate
         self._exec(
             "INSERT INTO audit_events (id, tenant_id, actor, action, target, "
             "meta, ts) VALUES (?, ?, ?, ?, ?, ?, ?)",

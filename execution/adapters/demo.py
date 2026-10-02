@@ -79,20 +79,22 @@ class DemoProvider:
 
         # Intent-named simulated failure modes — truthful, distinct states.
         if request.intent == "demo:fail":
+            # Non-SUCCESS outcomes carry NO value (W1 truth rule) — the
+            # explanatory detail is the entire payload.
             outcome = TruthfulValue(
                 TruthState.FAILED,
-                {"demo": True, "simulated": "failure"},
-                "DemoProvider simulated a FAILED outcome at the caller's "
-                "explicit request; no real deployment was attempted",
+                None,
+                "DemoProvider simulated a FAILED outcome (demo:true) at the "
+                "caller's explicit request; no real deployment was attempted",
             )
             lifecycle = ExecutionLifecycleState.FAILED
         elif request.intent == "demo:unknown":
             outcome = TruthfulValue(
                 TruthState.UNKNOWN,
-                {"demo": True, "simulated": "unknown-outcome"},
-                "DemoProvider simulated an UNKNOWN outcome at the caller's "
-                "explicit request; the true result of the simulated run was "
-                "not observable",
+                None,
+                "DemoProvider simulated an UNKNOWN outcome (demo:true) at "
+                "the caller's explicit request; the true result of the "
+                "simulated run was not observable",
             )
             lifecycle = ExecutionLifecycleState.OUTCOME_UNKNOWN
         else:
