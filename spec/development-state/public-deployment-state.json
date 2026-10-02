@@ -53,15 +53,20 @@
       "reviewRecord": "PR #24 COMMENT id 5947787903 (TL fresh matrix at exact head 67df5eb: 80 bun tests / lint+typecheck clean / 606 pytest / compileall clean / gate 12/12; TL reconciliation commit 0b56b43 landed on the PR per the review protocol)"
     },
     "PUB-03": {
-      "status": "DISPATCHED",
+      "status": "WAITING_FOR_ARCHITECT",
       "owner": "Worker C",
       "dependencies": [
         "PUB-00"
       ],
-      "base": "7b1adb4",
+      "base": "7a3b1eb29df0c67cdc54dc4182e7911eefd52891",
       "session": "pub-03-freetier-infra",
       "sessionChat": "https://chat.z.ai/c/939f1bb0-48f4-4e99-9051-012544789c13",
-      "dispatchedAt": "2026-10-02T02:51:52Z"
+      "dispatchedAt": "2026-10-02T02:51:52Z",
+      "pr": 26,
+      "branch": "work/pub-03-freetier-infra",
+      "branchHead": "126e6ef2f34459ea4a5bb8e656b1153f59a01d24",
+      "implementationHead": "126e6ef2f34459ea4a5bb8e656b1153f59a01d24",
+      "note": "Review-ready at PR #26. Base updated to the re-dispatch base 7a3b1eb (live merged main incl. PUB-01+PUB-02 merges). Delivered: final infra/render.yaml (verified build/start commands), infra/vercel/ config + runbook, idempotent Neon/Upstash/R2 setup scripts + runbooks (offline selftests/dry-runs green; live paths operator-input), additive environment.example names, NEW .github/workflows/pub.yml §G matrix on overlay-root PRs (tests workflow byte-untouched), deployment runbook Stage A-C with operator-held credential inputs, preview-environments + ci-gates docs, Apify actor skeleton (NO Dockerfile — PUB-08). Gate matrix at implementation head 126e6ef: pytest 605/606 (the pre-disclosed env-drift OpenAPI digest finding ONLY — identical failure reproduced at pristine base 7a3b1eb in a clean worktree; OPENAPI_SNAPSHOT_SHA256 NOT changed per instruction; fastapi 0.142.2/pydantic 2.13.5), compileall clean, final_gate_check full 10/12 (G06+G11 = the same known test) / check-only PASS 11/12 exit 0, web gates green (lint/typecheck/80 bun tests). Checkpoint: spec/development-state/PUB-03-checkpoint.md. The checkpoint/state commit that follows the implementation head is the final branch tip (adds only checkpoint + this status record — no code). No unmerged sibling dependency, no frozen surface touched, no merge performed."
     },
     "PUB-04": {
       "status": "PENDING",
