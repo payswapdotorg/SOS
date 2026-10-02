@@ -27,11 +27,16 @@
       ]
     },
     "PUB-02": {
-      "status": "PENDING",
+      "status": "WAITING_FOR_ARCHITECT",
       "owner": "Worker B",
       "dependencies": [
         "PUB-00"
-      ]
+      ],
+      "branch": "work/pub-02-nextjs-cockpit",
+      "pr": 24,
+      "baseSha": "7b1adb4a6461565d54d689a05bda159474646966",
+      "implementationHead": "53cf06c777820d57526b40bc53dd25cf5a50fda7",
+      "note": "apps/web Next.js 16 App Router + TypeScript cockpit: typed /api/v1 client (contract \u00a7C mirror, relative URLs, NEXT_PUBLIC_API_BASE env, fixture/demo mode), full directive \u00a75 surfaces, Journey-1 demo fixtures, 59 bun tests green + lint/typecheck clean; python suite 551 passed at the head (frozen surface untouched). Built against the CONTRACT + fixtures only (no unmerged sibling dependency)."
     },
     "PUB-03": {
       "status": "PENDING",
