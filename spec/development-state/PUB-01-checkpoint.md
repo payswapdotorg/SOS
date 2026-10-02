@@ -177,7 +177,11 @@ at bootstrap).
   in Git before work).
 - **No frozen surface touched** (`src/sos` byte-identical; frozen docs
   byte-identical; gate logic changed ONLY per §D PUB-01.1).
-- **No merge performed**; no self-approval; no successor work item created.
+- **No merge of PUB-01 into main performed**; no self-approval; no
+  successor work item created. (One main→branch SYNC-merge of the TL's
+  wave-1 dispatch record `73742ce` is recorded in branch history solely to
+  resolve the textual overlap in the state JSON — it merges main INTO the
+  branch, not this work into main; disclosed in its commit message.)
 - Architecture Change Requests: **none** — no `src/sos` change was
   required.
 - Stopping at **WAITING_FOR_ARCHITECT**.
