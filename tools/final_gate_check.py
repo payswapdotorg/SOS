@@ -213,6 +213,26 @@ DEPLOYMENT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     ".sql",
 )
 
+# PUB-01 G09 overlay-prefix reconciliation (Public Deployment Overlay, per
+# spec/deployment/PUBLIC-DEPLOYMENT-CONTRACT.md §D PUB-01 — the binding
+# authority): the post-roadmap productization overlay intentionally adds
+# deployment-shaped paths (db/migrations/, the future Apify actor Dockerfile,
+# ...) INSIDE the governed overlay roots. A path is exempt from the G09
+# artifact-pattern scan ONLY if it starts with one of these prefixes; the
+# entire frozen surface outside them remains fully scanned. Disclosed
+# post-roadmap reconciliation (precedent class: 69c822f state-aware G10
+# adaptation, a956325 CI full-history checkout).
+POST_ROADMAP_OVERLAY_PREFIXES: tuple[str, ...] = (
+    "apps/",
+    "services/",
+    "providers/",
+    "execution/",
+    "db/",
+    "infra/",
+    "docs/deployment/",
+    "spec/deployment/",
+)
+
 REQUIREMENT_IDS: tuple[str, ...] = tuple(f"R{i}" for i in range(1, 25))
 ROADMAP_LEDGER_WAVES: tuple[str, ...] = tuple(f"W{i}" for i in range(0, 16))
 W0_TASK = "W0"
@@ -1323,14 +1343,21 @@ def check_g09_rollback_safety(
                 )
             else:
                 recorded.append(f"{wave}:scope-exclusion")
+    # PUB-01 G09 overlay-prefix reconciliation: a path is exempt from the
+    # artifact-pattern scan ONLY if it starts with one of the governed
+    # POST_ROADMAP_OVERLAY_PREFIXES (contract §D PUB-01); everything else —
+    # the entire frozen surface — remains fully scanned. The existing
+    # .git/.github/__pycache__/.pytest_cache walk exclusions are unchanged.
     artifact_hits = [
         p
         for p in state.repo_paths
-        if any(pat in p.lower() for pat in state.baseline.deployment_artifact_patterns)
+        if not p.startswith(POST_ROADMAP_OVERLAY_PREFIXES)
+        and any(pat in p.lower() for pat in state.baseline.deployment_artifact_patterns)
     ]
     if artifact_hits:
         problems.append(
-            "deployment/migration artifacts present in the repository tree: "
+            "deployment/migration artifacts present in the repository tree "
+            "(frozen surface; POST_ROADMAP_OVERLAY_PREFIXES are exempt): "
             + ", ".join(artifact_hits)
         )
     if problems:
@@ -1343,11 +1370,15 @@ def check_g09_rollback_safety(
         f"every wave W1–W15 carries its rollback declaration in the "
         f"baseline-recorded carrier ({len(recorded)} declarations: "
         + ", ".join(recorded)
-        + "); no deployment/migration/network artifact exists anywhere in "
-        "the repository tree; combined with G02 (exactly the frozen module "
-        "surface) and G06 (suite green, including every wave's "
-        "rollback-invariant tests) each merged authority is revertable by "
-        "ordinary Git with no unrevertable external state",
+        + "); no deployment/migration/network artifact exists in the frozen "
+        "surface of the repository tree (the allowlisted Public Deployment "
+        "Overlay roots — "
+        + ", ".join(POST_ROADMAP_OVERLAY_PREFIXES)
+        + " — are governed by "
+        "spec/deployment/PUBLIC-DEPLOYMENT-CONTRACT.md); combined with G02 "
+        "(exactly the frozen module surface) and G06 (suite green, including "
+        "every wave's rollback-invariant tests) each merged authority is "
+        "revertable by ordinary Git with no unrevertable external state",
     )
 
 

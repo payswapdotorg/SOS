@@ -1,0 +1,35 @@
+-- PUB-01 migration 0002 (DOWN): reverse 0002 exactly.
+
+DROP INDEX IF EXISTS idx_audit_events_tenant;
+DROP TABLE IF EXISTS audit_events;
+DROP INDEX IF EXISTS idx_jobs_idempotency;
+DROP INDEX IF EXISTS idx_jobs_tenant;
+DROP TABLE IF EXISTS jobs;
+DROP INDEX IF EXISTS idx_memory_entries_workspace;
+DROP TABLE IF EXISTS memory_entries;
+DROP INDEX IF EXISTS idx_learning_records_workspace;
+DROP TABLE IF EXISTS learning_records;
+DROP INDEX IF EXISTS idx_executions_experiment;
+DROP INDEX IF EXISTS idx_executions_workspace;
+DROP TABLE IF EXISTS executions;
+DROP INDEX IF EXISTS idx_experiments_candidate;
+DROP INDEX IF EXISTS idx_experiments_workspace;
+DROP TABLE IF EXISTS experiments;
+DROP INDEX IF EXISTS idx_authorizations_workspace;
+DROP TABLE IF EXISTS authorizations;
+DROP INDEX IF EXISTS idx_decisions_workspace;
+DROP TABLE IF EXISTS decisions;
+DROP INDEX IF EXISTS idx_assurance_runs_candidate;
+DROP INDEX IF EXISTS idx_assurance_runs_workspace;
+DROP TABLE IF EXISTS assurance_runs;
+DROP INDEX IF EXISTS idx_candidates_workspace;
+DROP TABLE IF EXISTS candidates;
+DROP INDEX IF EXISTS idx_hypotheses_workspace;
+DROP TABLE IF EXISTS hypotheses;
+DROP INDEX IF EXISTS idx_evidence_system;
+DROP INDEX IF EXISTS idx_evidence_workspace;
+DROP TABLE IF EXISTS evidence;
+DROP INDEX IF EXISTS idx_system_revisions_system;
+DROP TABLE IF EXISTS system_revisions;
+DROP INDEX IF EXISTS idx_systems_workspace;
+DROP TABLE IF EXISTS systems;
