@@ -38,15 +38,16 @@
       "reviewRecord": "PR #25 COMMENT id 5947580162 (TL fresh matrix at exact head 5a24c47: 606 passed / compileall clean / final gate 12/12 / FastAPI boot smoke truthful health + OpenAPI 3.1.0)"
     },
     "PUB-02": {
-      "status": "DISPATCHED",
+      "status": "WAITING_FOR_ARCHITECT",
       "owner": "Worker B",
       "dependencies": [
         "PUB-00"
       ],
-      "base": "7b1adb4",
-      "session": "pub-02-nextjs-cockpit",
-      "sessionChat": "https://chat.z.ai/c/06802e20-1ce0-4ff6-936d-4ead930894e1",
-      "dispatchedAt": "2026-10-02T02:51:17Z"
+      "branch": "work/pub-02-nextjs-cockpit",
+      "pr": 24,
+      "baseSha": "7b1adb4a6461565d54d689a05bda159474646966",
+      "implementationHead": "53cf06c777820d57526b40bc53dd25cf5a50fda7",
+      "note": "apps/web Next.js 16 App Router + TypeScript cockpit: typed /api/v1 client (contract \u00a7C mirror, relative URLs, NEXT_PUBLIC_API_BASE env, fixture/demo mode), full directive \u00a75 surfaces, Journey-1 demo fixtures, 59 bun tests green + lint/typecheck clean; python suite 551 passed at the head (frozen surface untouched). Built against the CONTRACT + fixtures only (no unmerged sibling dependency). TL reconciliation landed on the branch (commit 0b56b43): client aligned to the PUB-01 OpenAPI (workspaceId/candidateId params; /audit + /architecture + single-revision paths retired in favor of workspace-detail recentActivity, currentRevision.graph, collection narrowing; frozen W3 graph vocabulary 1:1; wire-shape Uncertainty/SourceRef/RecoveryInfo); 80 bun tests / lint / typecheck green at the reconciled head."
     },
     "PUB-03": {
       "status": "DISPATCHED",
