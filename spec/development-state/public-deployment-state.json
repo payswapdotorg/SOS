@@ -20,25 +20,37 @@
       "note": "Merged as ad3bf5c (PR #23, merge commit). Remote-ref truth gate passed (branch head aefa3e5 fetchable); TL re-ran the full gate matrix at the exact head: 551 passed / compileall clean / final gate OVERALL PASS. COMMENT-form TL review record posted on PR #23 (id 5944683909)."
     },
     "PUB-01": {
-      "status": "PENDING",
+      "status": "DISPATCHED",
       "owner": "Worker A",
       "dependencies": [
         "PUB-00"
-      ]
+      ],
+      "base": "7b1adb4",
+      "session": "pub-01-fastapi-adapter",
+      "sessionChat": "https://chat.z.ai/c/b9d762e8-306e-49de-8806-1e05f9d8e0fd",
+      "dispatchedAt": "2026-10-02T02:50:39Z"
     },
     "PUB-02": {
-      "status": "PENDING",
+      "status": "DISPATCHED",
       "owner": "Worker B",
       "dependencies": [
         "PUB-00"
-      ]
+      ],
+      "base": "7b1adb4",
+      "session": "pub-02-nextjs-cockpit",
+      "sessionChat": "https://chat.z.ai/c/06802e20-1ce0-4ff6-936d-4ead930894e1",
+      "dispatchedAt": "2026-10-02T02:51:17Z"
     },
     "PUB-03": {
-      "status": "PENDING",
+      "status": "DISPATCHED",
       "owner": "Worker C",
       "dependencies": [
         "PUB-00"
-      ]
+      ],
+      "base": "7b1adb4",
+      "session": "pub-03-freetier-infra",
+      "sessionChat": "https://chat.z.ai/c/939f1bb0-48f4-4e99-9051-012544789c13",
+      "dispatchedAt": "2026-10-02T02:51:52Z"
     },
     "PUB-04": {
       "status": "PENDING",
@@ -123,7 +135,7 @@
     "PUB-02",
     "PUB-03"
   ],
-  "currentTask": "PUB-01 (Worker A) | PUB-02 (Worker B) | PUB-03 (Worker C) \u2014 wave-1 parallel dispatch",
+  "currentTask": "PUB-01 | PUB-02 | PUB-03 (wave-1 in flight; three parallel agent sessions)",
   "notes": [
     "Program authorized by the operator directive recorded verbatim in spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md (received 2026-10-02 in the operator's authenticated session channel).",
     "The frozen W0-W15 artifacts stay authoritative and untouched: implementation-state.json remains ROADMAP_COMPLETE with currentFrontier=[] and currentTask=null; all PUB progress is recorded ONLY in this file.",
