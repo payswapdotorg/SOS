@@ -83,3 +83,33 @@ SOS_APIFY_MAX_CONCURRENT=2        # Apify low-concurrency semaphore (S14)
 # ---------------------------------------------------------------------------
 SOS_LOCAL_DB_PATH=                # LOCAL SQLite database file
 SOS_LOCAL_ARTIFACTS_DIR=          # LOCAL content-addressed artifact store root
+
+# ---------------------------------------------------------------------------
+# Web client (apps/web — PUB-02 consumer names, wired on Vercel by PUB-03).
+# These are BUILD-TIME inlined by Next.js: set them in the Vercel project
+# environment, NOT on Render. See infra/vercel/README.md.
+# ---------------------------------------------------------------------------
+# ORIGIN-level base ONLY (no /api/v1 suffix — the typed client owns the
+# version prefix, e.g. https://sos-api.onrender.com). Unset = fixture/demo
+# mode (no API configured); set-but-empty = same-origin /api/v1.
+NEXT_PUBLIC_API_BASE=
+# Leave unset for normal resolution; set to `fixtures` to force the typed
+# demo fixtures (labeled demo data) regardless of API configuration.
+NEXT_PUBLIC_API_MODE=
+
+# ---------------------------------------------------------------------------
+# OPERATOR SETUP-SHELL variables (PUB-03) — inputs to the infra/*/setup.py
+# provisioning/verification scripts, read from the operator's shell. They are
+# NOT application runtime variables: never set them on Render/Vercel, never
+# commit them. Documented per provider: infra/neon/README.md,
+# infra/upstash/README.md, infra/r2/README.md. The R2 setup script reuses the
+# SOS_R2_* application names above.
+# ---------------------------------------------------------------------------
+# NEON_API_KEY=                   # console.neon.tech → Account → API keys
+# SOS_NEON_PROJECT=               # Neon project name (default: sos-public)
+# SOS_NEON_BRANCH=                # branch to provision/verify (default: main)
+# SOS_NEON_API_BASE=              # Neon API base (default: https://api.neon.tech/v2)
+# UPSTASH_OWNER_EMAIL=            # optional setup.py --create mode only
+# UPSTASH_OWNER_API_KEY=          # optional setup.py --create mode only
+# UPSTASH_REDIS_REST_URL=         # optional REST verification (else SOS_REDIS_URL)
+# UPSTASH_REDIS_REST_TOKEN=       # optional REST verification
