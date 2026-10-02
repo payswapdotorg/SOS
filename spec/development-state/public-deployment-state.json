@@ -15,7 +15,7 @@
       "owner": "TL",
       "dependencies": [],
       "mergedAs": null,
-      "note": "Contract artifacts authored; branch work/pub-00-deployment-contract @ 54ec3b8 (gate matrix green: 551 passed / compileall clean / gate 12-12). Push to remote pending operator GitHub PAT (write credential)."
+      "note": "Contract artifacts authored (9 files, +2649 lines); gate matrix green at every revision through the final authored head (551 passed / compileall clean / gate 12/12). Operator GitHub PAT provided 2026-10-02 in the authenticated session channel — push and merge unblocked; the PAT is substituted at send time from the TL environment and is never persisted in Git."
     },
     "PUB-01": {
       "status": "PENDING",
