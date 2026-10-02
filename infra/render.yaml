@@ -1,0 +1,70 @@
+# Render service definition — SOS public API (FastAPI transport adapter)
+#
+# PUB-00 contract skeleton. PUB-03 (Worker C) owns the final deployment
+# configuration; changes must keep: free instance class, health check on
+# /api/v1/health, env wiring per infra/environment.example, no state on the
+# local filesystem or in process memory (directive §3 Render lane).
+#
+# Render Blueprint v1 reference form; validate with `render blueprint validate`
+# or the equivalent structural checks documented in docs/deployment/.
+
+services:
+  - type: web
+    name: sos-api
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: services/api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      # --- mode (infra/environment.example is the naming authority) ---
+      - key: SOS_ENV
+        value: public
+      - key: SOS_PERSISTENCE
+        value: neon
+      - key: SOS_COORDINATION
+        value: upstash
+      - key: SOS_ARTIFACTS
+        value: r2
+      - key: SOS_EXECUTION
+        value: demo            # PUB-08 flips to apify when the actor is live
+      # --- URLs ---
+      - key: SOS_API_BASE_URL
+        sync: false            # set at first deploy (https://<service>.onrender.com)
+      - key: SOS_WEB_BASE_URL
+        sync: false            # set at first deploy (Vercel production URL)
+      # --- secrets (sync: false — NEVER committed) ---
+      - key: SOS_DATABASE_URL
+        sync: false            # Neon connection string (PUBLIC branch)
+      - key: SOS_REDIS_URL
+        sync: false            # Upstash Redis URL
+      - key: SOS_R2_ENDPOINT
+        sync: false
+      - key: SOS_R2_ACCESS_KEY_ID
+        sync: false
+      - key: SOS_R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: SOS_R2_BUCKET
+        sync: false
+      - key: SOS_GITHUB_CLIENT_ID
+        sync: false
+      - key: SOS_GITHUB_CLIENT_SECRET
+        sync: false
+      - key: SOS_SESSION_SECRET
+        sync: false
+      - key: SOS_JOB_CALLBACK_SECRET
+        sync: false            # HMAC secret for provider callbacks (PUB-08)
+      - key: SOS_APIFY_TOKEN
+        sync: false
+      - key: SOS_APIFY_ACTOR_ID
+        sync: false
+      - key: SOS_GITHUB_SOURCE_PAT
+        sync: false            # optional read-scoped source adapter token
+    # Free-tier notes (directive §3/§14): the instance sleeps after 15 min
+    # idle and takes ~1 min to wake; /api/v1/health must report truthfully
+    # (never fake ok). Long-running work MUST go through the job layer
+    # (PUB-06) — never in this process.
