@@ -1,0 +1,130 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SOS bounded execution actor input (skeleton — PUB-03)",
+    "description": "The bounded job input the Render API dispatches to this actor (directive §9; contract §D PUB-08). The actor never decides authorization — it executes exactly this authorized, bounded request and reports truthfully. Every field is bounded: an input that exceeds a limit is rejected before any work runs (fail-closed).",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "jobId",
+        "tenantId",
+        "authorizedAction",
+        "sourceRevision",
+        "allowedOperation",
+        "limits",
+        "callbackTarget"
+    ],
+    "properties": {
+        "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The durable Job id (directive §8) this run belongs to."
+        },
+        "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Tenant (workspace) that owns the job — used for artifact key scoping only, never for authorization decisions."
+        },
+        "authorizedAction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "The exact action the SOS authority layer authorized (authorization snapshot lives in the Job record). The actor MUST NOT execute anything beyond it."
+        },
+        "sourceRevision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "url", "revision"],
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": ["github_commit"],
+                    "description": "Immutable source reference kind. 'latest main' style mutable refs are forbidden (security gate S11)."
+                },
+                "url": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "description": "Repository URL."
+                },
+                "revision": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$",
+                    "description": "Exact 40-hex commit SHA (S11: exact source revision recording)."
+                }
+            },
+            "description": "The EXACT immutable source revision the operation is bounded to."
+        },
+        "allowedOperation": {
+            "type": "string",
+            "enum": ["repository_analysis", "bounded_source_extraction", "website_ingestion", "document_ingestion"],
+            "description": "The single allowed operation for this run. Anything else the input asks for is refused."
+        },
+        "limits": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["timeLimitSeconds", "maxMemoryMb", "maxOutputArtifactMb"],
+            "properties": {
+                "timeLimitSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 900,
+                    "description": "Wall-clock bound for the whole run (security gate S14)."
+                },
+                "maxMemoryMb": {
+                    "type": "integer",
+                    "minimum": 64,
+                    "maximum": 2048,
+                    "description": "Memory bound (S14)."
+                },
+                "maxOutputArtifactMb": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "Output artifact size bound (S15-aligned)."
+                }
+            },
+            "description": "Resource bounds (S14). The run aborts FAILED when exceeded — never reports success."
+        },
+        "callbackTarget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url", "nonce", "timestamp", "signature"],
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "description": "The signed provider-callback endpoint on the Render API."
+                },
+                "nonce": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 64,
+                    "description": "Replay-protection nonce (security gate S10)."
+                },
+                "timestamp": {
+                    "type": "string",
+                    "description": "ISO-8601 emission time for the timestamp window (S10)."
+                },
+                "signature": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 256,
+                    "description": "HMAC signature of the callback envelope (S10: validated BEFORE any state mutation on the API side)."
+                }
+            },
+            "description": "Where the execution receipt is delivered. The actor cannot authorize itself (S12): the callback is proof of execution, never proof of authority."
+        },
+        "requestHash": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "SHA-256 of the canonical request — the actor echoes it in the receipt so the API can verify the run matched the dispatched job exactly."
+        },
+        "artifactPolicy": {
+            "type": "string",
+            "enum": ["upload_to_r2", "callback_only"],
+            "default": "callback_only",
+            "description": "Whether output artifacts are uploaded (pre-signed R2 URLs provided by the dispatcher in PUB-08) or the receipt carries inline results only."
+        }
+    }
+}

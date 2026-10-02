@@ -1,0 +1,6 @@
+# SOS bounded execution actor — dependency manifest (skeleton, PUB-03).
+#
+# NOT BUILT in PUB-03: the actor's Dockerfile lands with PUB-08 (contract
+# §A.7 — the G09-pattern Dockerfile may not land in this item). This
+# manifest exists so PUB-08's build has a complete, reviewed starting point.
+apify>=1.0,<2.0

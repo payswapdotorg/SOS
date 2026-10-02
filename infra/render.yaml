@@ -1,12 +1,37 @@
-# Render service definition — SOS public API (FastAPI transport adapter)
+# Render Blueprint — SOS public API (FastAPI transport adapter) — FINAL (PUB-03)
 #
-# PUB-00 contract skeleton. PUB-03 (Worker C) owns the final deployment
-# configuration; changes must keep: free instance class, health check on
-# /api/v1/health, env wiring per infra/environment.example, no state on the
-# local filesystem or in process memory (directive §3 Render lane).
+# Supersedes the PUB-00 skeleton. Binding constraints (directive §3 Render
+# lane, §20 PUBLIC environment; contract §D PUB-03):
+#   * free instance class (0.1 CPU / 512 MB) — no paid resources required;
+#   * Python runtime, repo rootDir services/api (directive §4 layout);
+#   * health check on /api/v1/health — must stay TRUTHFUL (a degraded
+#     adapter reports degraded, never a fake ok);
+#   * env wiring exactly per infra/environment.example (the naming
+#     authority; every name below exists there);
+#   * NO durable state on the local filesystem or in process memory — the
+#     free instance is ephemeral and spins down (durable state lives in
+#     Neon/Upstash/R2 per the adapter seams);
+#   * long-running work is FORBIDDEN in this process — it belongs to the
+#     job layer (PUB-06) and Apify bounded execution (PUB-08).
 #
-# Render Blueprint v1 reference form; validate with `render blueprint validate`
-# or the equivalent structural checks documented in docs/deployment/.
+# Free-tier spin-down behavior (directive §3): the instance sleeps after
+# 15 minutes without traffic and takes roughly a minute to wake. This is
+# acceptable for Stage A/B (private + public read/demo). Do NOT generate
+# fake keep-alive traffic to defeat spin-down — that is dishonest use of the
+# free tier; Stage D (commercial hardening) upgrades the plan instead.
+#
+# Structural validation: `render blueprint validate` against this file, or
+# the documented manual equivalent in docs/deployment/ci-gates.md (YAML
+# parse + required-field/enum checks + env-name reconciliation against
+# infra/environment.example). The local structural check ran in PUB-03
+# verification (see spec/development-state/PUB-03-checkpoint.md).
+#
+# rootDir semantics (verified in PUB-03): Render checks out the full repo
+# and runs build/start with cwd = services/api. The install therefore
+# targets the repo-root pyproject (which owns the [api] dependency group),
+# and uvicorn gets --app-dir ../.. so the repo root is on sys.path for the
+# services.api.main:app module (the editable install only exposes the src/
+# layout `sos` package, not `services.*`).
 
 services:
   - type: web
@@ -16,12 +41,16 @@ services:
     region: oregon
     branch: main
     rootDir: services/api
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --upgrade pip && pip install -e '../..[api]'
+    startCommand: uvicorn services.api.main:app --app-dir ../.. --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     autoDeploy: true
     envVars:
-      # --- mode (infra/environment.example is the naming authority) ---
+      # --- Python runtime (keep major.minor aligned with CI: 3.12) ---
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      # --- mode switches (infra/environment.example is the naming authority;
+      #     these values are the PUBLIC target config per directive §20) ---
       - key: SOS_ENV
         value: public
       - key: SOS_PERSISTENCE
@@ -32,39 +61,57 @@ services:
         value: r2
       - key: SOS_EXECUTION
         value: demo            # PUB-08 flips to apify when the actor is live
-      # --- URLs ---
+      # --- URLs (set at first deploy in the dashboard) ---
       - key: SOS_API_BASE_URL
-        sync: false            # set at first deploy (https://<service>.onrender.com)
+        sync: false            # https://<service>.onrender.com
       - key: SOS_WEB_BASE_URL
-        sync: false            # set at first deploy (Vercel production URL)
-      # --- secrets (sync: false — NEVER committed) ---
+        sync: false            # Vercel production URL
+      # --- secrets (sync: false — operator-held, NEVER committed; S2) ---
       - key: SOS_DATABASE_URL
-        sync: false            # Neon connection string (PUBLIC branch)
+        sync: false            # Neon PUBLIC branch (postgresql+asyncpg://…)
       - key: SOS_REDIS_URL
-        sync: false            # Upstash Redis URL
+        sync: false            # Upstash Redis (rediss://…:6379)
       - key: SOS_R2_ENDPOINT
-        sync: false
+        sync: false            # https://<account>.r2.cloudflarestorage.com
       - key: SOS_R2_ACCESS_KEY_ID
         sync: false
       - key: SOS_R2_SECRET_ACCESS_KEY
         sync: false
       - key: SOS_R2_BUCKET
-        sync: false
+        sync: false            # private bucket (security gate S3)
       - key: SOS_GITHUB_CLIENT_ID
-        sync: false
+        sync: false            # PUB-04 (GitHub OAuth app)
       - key: SOS_GITHUB_CLIENT_SECRET
         sync: false
       - key: SOS_SESSION_SECRET
-        sync: false
+        sync: false            # 32+ random bytes (fail-closed without it)
       - key: SOS_JOB_CALLBACK_SECRET
         sync: false            # HMAC secret for provider callbacks (PUB-08)
       - key: SOS_APIFY_TOKEN
-        sync: false
+        sync: false            # required only when SOS_EXECUTION=apify
       - key: SOS_APIFY_ACTOR_ID
         sync: false
       - key: SOS_GITHUB_SOURCE_PAT
         sync: false            # optional read-scoped source adapter token
-    # Free-tier notes (directive §3/§14): the instance sleeps after 15 min
-    # idle and takes ~1 min to wake; /api/v1/health must report truthfully
-    # (never fake ok). Long-running work MUST go through the job layer
-    # (PUB-06) — never in this process.
+      # --- rate limits / free-tier protection (directive §13; non-secret.
+      #     Baseline values equal the code defaults from environment.example;
+      #     Stage C tuning per docs/deployment/deployment-runbook.md) ---
+      - key: SOS_RATE_ANON_PER_MIN
+        value: "60"            # anonymous: demo reads only
+      - key: SOS_RATE_USER_PER_MIN
+        value: "240"
+      - key: SOS_RATE_WRITE_PER_MIN
+        value: "30"
+      - key: SOS_RATE_JOB_PER_HOUR
+        value: "10"            # deliberately low expensive-job quota (Stage C)
+      - key: SOS_RATE_RECOVERY_PER_HOUR
+        value: "2"
+      - key: SOS_RATE_ARTIFACT_MAX_MB
+        value: "50"            # S15 artifact size cap
+      - key: SOS_RATE_BODY_MAX_MB
+        value: "1"             # S16 request payload cap
+      - key: SOS_APIFY_MAX_CONCURRENT
+        value: "2"             # S14 Apify low-concurrency semaphore
+    # LOCAL-only names (SOS_LOCAL_DB_PATH / SOS_LOCAL_ARTIFACTS_DIR) are
+    # intentionally NOT wired here: this service is the PUBLIC deployment;
+    # LOCAL state paths are CI/development concerns with code defaults.

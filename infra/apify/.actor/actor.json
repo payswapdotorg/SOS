@@ -1,0 +1,12 @@
+{
+    "actorSpecification": 1,
+    "name": "sos-bounded-execution",
+    "title": "SOS bounded execution actor (skeleton — PUB-03)",
+    "description": "Bounded execution/ingestion actor for the SOS public deployment. PUB-03 delivers this project skeleton ONLY (package metadata, input schema, stub entry). The execution semantics, resource-limit enforcement, signed callback emission and the Dockerfile land with PUB-08 (contract §A.7 / §D PUB-08).",
+    "version": "0.1.0",
+    "meta": {
+        "template": "python-skeleton",
+        "owner": "PUB-03 (Worker C)",
+        "implementation": "PUB-08 (Worker C)"
+    }
+}

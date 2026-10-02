@@ -1,0 +1,97 @@
+# pub — Public Deployment Overlay gate matrix (PUB-03)
+#
+# Runs the contract §G matrix on pull requests that touch the overlay roots
+# (plus the few frozen-adjacent files that drive the matrix itself):
+#
+#   python-gates:  python -m pytest                 (hermetic, api group installed)
+#                  python -m compileall -q src tests services providers execution
+#                  python tools/final_gate_check.py  (12/12, overlay-scoped G09)
+#   web-gates:     cd apps/web && bun install && bun run lint && bun run typecheck && bun test
+#
+# Scope discipline (contract §A.4 / §D PUB-03):
+#   * This workflow is a NEW file; the pre-existing `tests` workflow
+#     (.github/workflows/test.yml) is UNTOUCHED and keeps running on every
+#     push/PR with its own (pytest-only) semantics.
+#   * fetch-depth: 0 on the python job mirrors the `tests` workflow's
+#     full-history checkout: the W15 gate's git-resolver lineage checks
+#     (G04) need the whole history, including work/* PR heads.
+#   * Installing `-e ".[api]"` (unlike the `tests` workflow, which installs
+#     only pytest) makes the PUB-01 API test group actually RUN here — the
+#     pub matrix is the stronger gate, by design.
+#   * `workflow_dispatch` allows the TL to re-run the matrix at any exact
+#     head (anti-fabrication §F: reported numbers are re-run fresh).
+#   * push events are deliberately NOT triggered: every push/PR already runs
+#     the frozen `tests` workflow; the pub matrix is the PR-time overlay
+#     gate. Manual dispatch covers post-merge verification.
+
+name: pub
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # overlay roots (contract §A.4)
+      - 'apps/**'
+      - 'services/**'
+      - 'providers/**'
+      - 'execution/**'
+      - 'db/**'
+      - 'infra/**'
+      - 'docs/deployment/**'
+      - 'spec/deployment/**'
+      # machine state + checkpoints (reconciliation PRs)
+      - 'spec/development-state/public-deployment-state.json'
+      - 'spec/development-state/PUB-*.md'
+      # files that drive this matrix itself
+      - 'pyproject.toml'
+      - '.github/workflows/pub.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: pub-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-gates:
+    name: python gates (pytest + compileall + final_gate_check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # fetch-depth 0 (full history): the W15 final-gate integration test
+      # resolves historical SHAs across the whole W0-W15 lineage through the
+      # real Git resolver — same rationale as the `tests` workflow.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install (api group + pytest — the full §G python matrix needs the API tests to RUN, not skip)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[api]" pytest
+      - name: pytest (hermetic — no network)
+        run: python -m pytest
+      - name: compileall (src tests services providers execution)
+        run: python -m compileall -q src tests services providers execution
+      - name: final gate (12/12 expected, overlay-scoped G09)
+        run: python tools/final_gate_check.py
+
+  web-gates:
+    name: web gates (apps/web lint + typecheck + bun test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: bun install
+        run: bun install
+      - name: lint
+        run: bun run lint
+      - name: typecheck
+        run: bun run typecheck
+      - name: test
+        run: bun test
