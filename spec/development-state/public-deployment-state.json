@@ -27,7 +27,7 @@
       ],
       "pr": 25,
       "branch": "work/pub-01-fastapi-adapter",
-      "branchHead": "ae02e6c35118e50fd386dc61aca15ddc32d76bbd",
+      "branchHead": "79a76e047ce332d0abc4346c9756f0a8ac9faa3c",
       "note": "Review-ready (PR #25): FastAPI control-plane adapter on LOCAL provider seams; G09 overlay-prefix reconciliation landed as the standalone first commit (ea84ed2); 606 tests passed / compileall clean / final gate 12/12 at the implementation head; frozen surface untouched; no merge performed. Checkpoint: spec/development-state/PUB-01-checkpoint.md."
     },
     "PUB-02": {

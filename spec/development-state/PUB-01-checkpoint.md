@@ -6,8 +6,8 @@
 **Branch:** `work/pub-01-fastapi-adapter`
 **PR:** #25 (https://github.com/payswapdotorg/SOS/pull/25)
 **Base SHA:** `7b1adb4a6461565d54d689a05bda159474646966` (live `origin/main` HEAD at dispatch; PUB-00 merged as `ad3bf5c`, PR #23)
-**Implementation head (all code + tests):** `ae02e6c35118e50fd386dc61aca15ddc32d76bbd`
-**Final branch head:** this checkpoint commit (adds only this document and the state-JSON status fields — no code).
+**Implementation head (all code + tests; all verification below ran here):** `79a76e047ce332d0abc4346c9756f0a8ac9faa3c`
+**Final branch head:** the checkpoint/state commit that follows the implementation head (adds only checkpoint/state documents — no code).
 
 ## Traceability
 
@@ -103,20 +103,20 @@ untouched.
 
 ## Verification commands + verbatim results
 
-Run at the implementation head `ae02e6c35118e50fd386dc61aca15ddc32d76bbd`
-and re-run at the final head after this checkpoint commit (identical
-results — the checkpoint adds no code):
+Run at the implementation head `79a76e047ce332d0abc4346c9756f0a8ac9faa3c`
+(re-run after every subsequent doc-only commit — identical results; the
+checkpoint and state updates add no code):
 
 ```text
 $ python3 -m pytest
-606 passed in 16.75s
+606 passed in 17.72s
 
 $ python3 -m compileall -q src tests services providers execution
 (clean; no output; exit 0)
 
 $ python3 tools/final_gate_check.py
 G09 ROLLBACK_SAFETY [rollback safety]: PASS
-OVERALL: PASS — 12/12 checks PASS (0 FAIL, 0 DEFERRED) at ae02e6c…
+OVERALL: PASS — 12/12 checks PASS (0 FAIL, 0 DEFERRED) at 79a76e0…
 (exit 0; followed by `git restore spec/development-state/W15-gate-report.json`
 to keep the tree clean — the gate rewrites its own report file)
 
