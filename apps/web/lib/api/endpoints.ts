@@ -22,12 +22,20 @@ export const endpoints = {
   missions: () => `${V}/missions`,
   mission: (id: string) => `${V}/missions/${id}`,
   missionRevisions: (missionId: string) => `${V}/missions/${missionId}/revisions`,
-  missionRevision: (missionId: string, revisionId: string) =>
-    `${V}/missions/${missionId}/revisions/${revisionId}`,
+  /**
+   * Single revision fetch is NOT a wire path (the OpenAPI exposes only the
+   * collection). The client narrows the collection client-side — transport
+   * mapping only, no invented server route.
+   */
   systems: () => `${V}/systems`,
   system: (id: string) => `${V}/systems/${id}`,
   systemRecovery: (id: string) => `${V}/systems/${id}/recovery`,
-  systemArchitecture: (id: string) => `${V}/systems/${id}/architecture`,
+  /**
+   * The architecture graph is NOT a separate wire path: the authoritative
+   * OpenAPI ships it inside the system's current revision
+   * (`SystemDTO.currentRevision.graph`). The client derives it from
+   * `GET /systems/{id}` — no invented `/architecture` route.
+   */
   evidence: () => `${V}/evidence`,
   hypotheses: () => `${V}/hypotheses`,
   candidates: () => `${V}/candidates`,
@@ -44,16 +52,16 @@ export const endpoints = {
   learning: () => `${V}/learning`,
   memory: () => `${V}/memory`,
   /**
-   * Audit-event collection (Activity surface). Directive §7 does not spell
-   * this path out; contract §C.2 mandates persisted audit events (actor,
-   * action, target, timestamp, meta) for every mutation. This path is the
-   * client's provisional reference, to be reconciled when PUB-01 finalizes
-   * the wire surface — disclosed in the PUB-02 checkpoint.
+   * The Activity surface consumes the audit trail the authoritative wire
+   * already ships: `GET /workspaces/{id}` → `recentActivity`
+   * (`AuditEventDTO[]`). There is no `/api/v1/audit` collection path in the
+   * PUB-01 OpenAPI (the directive §7 endpoint map never listed one) — the
+   * earlier provisional path is retired (PUB-02 → PUB-01 reconciliation).
    */
-  audit: () => `${V}/audit`,
   jobs: () => `${V}/jobs`,
   job: (id: string) => `${V}/jobs/${id}`,
-  providers: () => `${V}/providers`,
+  /** The wire spells the provider surface as `/providers/status` (GET). */
+  providers: () => `${V}/providers/status`,
 } as const;
 
 /** Query-string builder for collection filters + cursor pagination. */

@@ -279,9 +279,10 @@ export const demo: DemoDataset = {
         integrations: 3,
       },
       uncertainty: {
-        level: "MODERATE",
-        notes:
+        state: "UNKNOWN",
+        reason:
           "Code topology recovered at high confidence; runtime behavior under seasonal peak is only partially observed (see evidence: runtime observation, telemetry).",
+        confidence: 0.82,
       },
       sourceRef: {
         kind: "GITHUB_REPO",
@@ -309,9 +310,10 @@ export const demo: DemoDataset = {
         integrations: 1,
       },
       uncertainty: {
-        level: "HIGH",
-        notes:
+        state: "UNAVAILABLE",
+        reason:
           "Recovery job still running; runtime observation currently UNAVAILABLE (agent unreachable), so neither structure nor behavior is fully known yet.",
+        confidence: null,
       },
       sourceRef: {
         kind: "GITHUB_REPO",
@@ -339,8 +341,9 @@ export const demo: DemoDataset = {
         integrations: 0,
       },
       uncertainty: {
-        level: "HIGH",
-        notes: "Failure is explicit: the analysis produced a structurally invalid graph.",
+        state: "FAILED",
+        reason: "Failure is explicit: the analysis produced a structurally invalid graph.",
+        confidence: null,
       },
       sourceRef: {
         kind: "GITHUB_REPO",
@@ -368,8 +371,9 @@ export const demo: DemoDataset = {
         integrations: 0,
       },
       uncertainty: {
-        level: "HIGH",
-        notes: "UNSUPPORTED is not FAILED: the source is reachable, the adapter does not cover it.",
+        state: "UNSUPPORTED",
+        reason: "UNSUPPORTED is not FAILED: the source is reachable, the adapter does not cover it.",
+        confidence: null,
       },
       sourceRef: {
         kind: "OTHER",
@@ -401,10 +405,10 @@ export const demo: DemoDataset = {
       edges: [
         { id: "e1", source: "gw", target: "order", kind: "CALLS", label: "accept order" },
         { id: "e2", source: "gw", target: "inv", kind: "CALLS", label: "reserve stock" },
-        { id: "e3", source: "order", target: "pg", kind: "WRITES", label: "persist order" },
-        { id: "e4", source: "inv", target: "pg", kind: "READS", label: "stock rows" },
-        { id: "e5", source: "inv", target: "redis", kind: "WRITES", label: "reservation lock" },
-        { id: "e6", source: "worker", target: "redis", kind: "READS", label: "TTL expiry events" },
+        { id: "e3", source: "order", target: "pg", kind: "DATA_FLOW", label: "persist order (write)" },
+        { id: "e4", source: "inv", target: "pg", kind: "DATA_FLOW", label: "stock rows (read)" },
+        { id: "e5", source: "inv", target: "redis", kind: "DATA_FLOW", label: "reservation lock (write)" },
+        { id: "e6", source: "worker", target: "redis", kind: "DATA_FLOW", label: "TTL expiry events (read)" },
         { id: "e7", source: "worker", target: "inv", kind: "CALLS", label: "release lock" },
         { id: "e8", source: "order", target: "notif", kind: "CALLS", label: "order events" },
         { id: "e9", source: "deploy", target: "gw", kind: "DEPLOYS", label: "revisions" },

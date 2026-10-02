@@ -331,7 +331,13 @@ export function SystemSummaryRows({ revision: r }: { revision: SystemRevision })
         </span>
       </KeyValue>
       <KeyValue label="Uncertainty">
-        {r.uncertainty.level} — {r.uncertainty.notes}
+        <span className="flex flex-wrap items-center gap-2">
+          <TruthStatePill state={r.uncertainty.state} />
+          <span className="text-xs text-slate-500">
+            {r.uncertainty.confidence !== null ? `confidence ${r.uncertainty.confidence} · ` : ""}
+            {r.uncertainty.reason}
+          </span>
+        </span>
       </KeyValue>
       <KeyValue label="Source" mono>
         {r.sourceRef.kind} · {r.sourceRef.url} @ {shortRevision(r.sourceRef.revision, 12)}{" "}

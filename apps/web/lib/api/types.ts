@@ -191,8 +191,13 @@ export interface System {
   currentRevisionId: string;
 }
 
-export type SourceRefKind = "GITHUB_REPO" | "MISSION_HYPOTHESIS" | "OTHER";
+export type SourceRefKind = string;
 
+/**
+ * Source reference. `kind` mirrors the authoritative wire `SourceRefDTO`
+ * (a free-form string — PUB-01 OpenAPI owns the full type); the demo
+ * fixtures use values like "GITHUB_REPO". No invented client enum.
+ */
 export interface SourceRef {
   kind: SourceRefKind;
   url: string;
@@ -211,16 +216,28 @@ export interface SystemStateSummary {
   integrations: number;
 }
 
+/**
+ * Uncertainty — mirrors the authoritative wire `UncertaintyDTO`
+ * (`{state: TruthState, reason, confidence}`), the frozen W3 shape. The
+ * earlier LOW/MODERATE/HIGH presentation enum is retired: it was a
+ * client-side vocabulary with no contract counterpart (PUB-02 → PUB-01
+ * reconciliation).
+ */
 export interface Uncertainty {
-  level: "LOW" | "MODERATE" | "HIGH";
-  notes: string;
+  state: TruthState;
+  reason: string;
+  confidence: number | null;
 }
 
-/** Recovery outcome — a truth state, never a fake success. */
+/**
+ * Recovery outcome — a truth state, never a fake success. Mirrors the wire
+ * `RecoveryInfoDTO` (`{jobId, status}`); `note` is an optional presentation
+ * extra the demo fixtures carry (the wire does not — yet).
+ */
 export interface RecoveryInfo {
   jobId: string;
   status: TruthState;
-  note: string;
+  note?: string;
 }
 
 export interface SystemRevision {
@@ -235,6 +252,13 @@ export interface SystemRevision {
 
 // --- Architecture graph -----------------------------------------------------
 
+/**
+ * Node kinds — exactly the frozen W3 graph vocabulary (display-uppercased):
+ * the authoritative wire `NodeType` enum has capability, service, component,
+ * data_store, interface, deployment, trust_boundary, policy, model, adapter,
+ * external_dependency. The UI renders all of them (1:1 with the wire; no
+ * client-invented kinds, none dropped).
+ */
 export type ArchitectureNodeKind =
   | "SERVICE"
   | "COMPONENT"
@@ -242,7 +266,11 @@ export type ArchitectureNodeKind =
   | "INTERFACE"
   | "DEPLOYMENT"
   | "TRUST_BOUNDARY"
-  | "CAPABILITY";
+  | "CAPABILITY"
+  | "POLICY"
+  | "MODEL"
+  | "ADAPTER"
+  | "EXTERNAL_DEPENDENCY";
 
 export interface ArchitectureNode {
   id: string;
@@ -251,14 +279,26 @@ export interface ArchitectureNode {
   notes: string;
 }
 
+/**
+ * Edge kinds — exactly the frozen W3 graph vocabulary (display-uppercased):
+ * the authoritative wire `EdgeType` enum has call, data-flow, dependency,
+ * trust, deployment, runtime-interaction, realizes, observes, influences,
+ * owns, constrains. 1:1 with the wire; no client-invented kinds. (The old
+ * READS/WRITES display kinds are retired — the wire spells both `data-flow`;
+ * the fixture labels keep the read/write specificity.)
+ */
 export type ArchitectureEdgeKind =
   | "CALLS"
+  | "DATA_FLOW"
   | "DEPENDS_ON"
   | "DEPLOYS"
-  | "READS"
-  | "WRITES"
   | "TRUSTS"
-  | "OBSERVES";
+  | "RUNTIME_INTERACTION"
+  | "REALIZES"
+  | "OBSERVES"
+  | "INFLUENCES"
+  | "OWNS"
+  | "CONSTRAINS";
 
 export interface ArchitectureEdge {
   id: string;

@@ -238,3 +238,43 @@ successor work, no frozen-surface modification (python suite re-run at
 the head: 551 passed — identical to the verified baseline), no secrets in
 any file or commit, PR #24 open for Architect review. Corrections stay
 on the same branch/PR.
+
+## TL reconciliation record (PUB-02 → PUB-01 wire contract) — 2026-10-02
+
+PUB-01 merged as `c98972a` (PR #25); its OpenAPI is now the authoritative
+wire contract. The TL performed the reconciliation **on this branch/PR**
+(as the review protocol directs — no parallel API semantics):
+
+1. **Parameter names aligned** (disclosure item 4, now resolved):
+   `?workspace=` → `?workspaceId=` (missions) and `?candidate=` →
+   `?candidateId=` (assurance) — the OpenAPI parameter names.
+   `?projection=current-revision` retired.
+2. **Invented wire paths retired**:
+   - `/api/v1/audit` (provisional, disclosure item 1) → the Activity surface
+     consumes `GET /workspaces/{id}` → `recentActivity` (`AuditEventDTO[]`;
+     `ts` → `timestamp` mapping in `lib/api/wire.ts`);
+   - `/api/v1/systems/{id}/architecture` → the graph ships inside the
+     system's current revision (`SystemDTO.currentRevision.graph`);
+   - single `/missions/{id}/revisions/{rid}` → collection narrowing;
+   - `providers` → `/api/v1/providers/status` (the wire path).
+3. **Graph vocabulary unified** with the frozen W3 enums (disclosure item
+   2): UI node/edge kinds are now the wire `NodeType`/`EdgeType` vocabulary
+   (display-uppercased, 1:1 — none dropped, none invented; the old
+   READS/WRITES display kinds retired in favor of `DATA_FLOW`).
+4. **DTO shapes aligned where they were pure client inventions**:
+   `Uncertainty` mirrors the wire `{state, reason, confidence}` (the
+   LOW/MODERATE/HIGH enum had no contract counterpart); `SourceRef.kind`
+   is the wire's free-form string; `RecoveryInfo.note` optional (fixture
+   presentation extra).
+5. **Honest degradation** (lib/api/wire.ts, tested): aggregates the wire
+   does not carry (health/drift) render UNKNOWN — never fabricated;
+   topology counts derive only from the provided graph. This is the
+   disclosed PUB-09 integration point for richer server-side aggregates.
+6. **Auth paths stay documented PUB-04 forward refs** (the sign-in route
+   explains the flow; nothing is fetched in fixture mode).
+
+Verification after reconciliation (TL, at the reconciled head):
+`bun run lint` clean · `bun run typecheck` clean · `bun test` **80 pass**
+(59 + 21 new wire/reconciliation tests) · python suite 551 passed
+(frozen surface untouched) · gate 12/12. Fixtures render unchanged
+(fixture mode); API mode now speaks only authoritative paths/params.

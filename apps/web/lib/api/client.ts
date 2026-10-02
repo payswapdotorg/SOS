@@ -18,6 +18,13 @@
 
 import { endpoints, withQuery } from "./endpoints";
 import { ApiError, isApiErrorEnvelope } from "./errors";
+import {
+  mapWireAuditEvent,
+  mapWireSystemCurrentRevision,
+  type WireCollection,
+  type WireSystem,
+  type WireWorkspaceDetail,
+} from "./wire";
 import type {
   ActivityEvent,
   ApiErrorEnvelope,
@@ -249,7 +256,8 @@ function createApiClient(runtime: ClientRuntime): SosClient {
   // Directive §7 defines {id} routes only for workspaces, missions (+revisions),
   // systems, experiments, executions and jobs. Other resources are fetched as
   // workspace-scoped collections and narrowed client-side — transport mapping
-  // only, no SOS semantics.
+  // only, no SOS semantics. Wire DTO shapes pass through lib/api/wire.ts
+  // mappers (PUB-01 OpenAPI = the authoritative wire contract).
   const oneFrom = async <T>(
     collection: Promise<Collection<T>>,
     pred: (item: T) => boolean,
@@ -269,19 +277,30 @@ function createApiClient(runtime: ClientRuntime): SosClient {
     getWorkspace: (id) => f<Workspace>(endpoints.workspace(id)),
     getMission: (workspaceId) =>
       oneFrom(
-        f<Collection<Mission>>(withQuery(endpoints.missions(), { workspace: workspaceId })),
+        f<Collection<Mission>>(withQuery(endpoints.missions(), { workspaceId })),
         (m) => m.workspaceId === workspaceId,
         `mission for workspace ${workspaceId}`,
       ),
     listMissionRevisions: (missionId, filter) =>
       f<Collection<MissionRevision>>(withQuery(endpoints.missionRevisions(missionId), filter ?? {})),
     getMissionRevision: (missionId, revisionId) =>
-      f<MissionRevision>(endpoints.missionRevision(missionId, revisionId)),
+      oneFrom(
+        f<Collection<MissionRevision>>(withQuery(endpoints.missionRevisions(missionId), {})),
+        (r) => r.id === revisionId,
+        `mission revision ${revisionId}`,
+      ),
     listSystems: (filter) => f<Collection<System>>(withQuery(endpoints.systems(), filter ?? {})),
     getSystem: (id) => f<System>(endpoints.system(id)),
-    getSystemRevision: (systemId) =>
-      f<SystemRevision>(withQuery(endpoints.system(systemId), { projection: "current-revision" })),
-    getArchitectureGraph: (systemId) => f<ArchitectureGraph>(endpoints.systemArchitecture(systemId)),
+    getSystemRevision: async (systemId) => {
+      const system = await f<WireSystem>(endpoints.system(systemId));
+      const mapped = mapWireSystemCurrentRevision(system);
+      if (!mapped) throw notFound(`current revision for system ${systemId}`);
+      return mapped.revision;
+    },
+    getArchitectureGraph: async (systemId) => {
+      const system = await f<WireSystem>(endpoints.system(systemId));
+      return mapWireSystemCurrentRevision(system)?.graph ?? { nodes: [], edges: [] };
+    },
     listEvidence: (filter) => f<Collection<Evidence>>(withQuery(endpoints.evidence(), filter ?? {})),
     getEvidence: (id) =>
       oneFrom(
@@ -301,7 +320,7 @@ function createApiClient(runtime: ClientRuntime): SosClient {
       ),
     listAssuranceRuns: (candidateId) =>
       f<Collection<AssuranceRun>>(
-        withQuery(endpoints.assurance(), candidateId ? { candidate: candidateId } : {}),
+        withQuery(endpoints.assurance(), candidateId ? { candidateId } : {}),
       ),
     listDecisions: (filter) => f<Collection<Decision>>(withQuery(endpoints.decisions(), filter ?? {})),
     getDecision: (id) =>
@@ -324,8 +343,22 @@ function createApiClient(runtime: ClientRuntime): SosClient {
       f<Collection<MemoryEntry>>(withQuery(endpoints.memory(), filter ?? {})),
     listJobs: (filter) => f<Collection<Job>>(withQuery(endpoints.jobs(), filter ?? {})),
     getJob: (id) => f<Job>(endpoints.job(id)),
-    listActivity: (filter) =>
-      f<Collection<ActivityEvent>>(withQuery(endpoints.audit(), filter ?? {})), // provisional path (see endpoints.ts)
+    listActivity: async (filter) => {
+      // The audit trail ships on the workspace detail (recentActivity —
+      // AuditEventDTO[]); there is no /api/v1/audit collection path. With no
+      // explicit workspace, the first workspace serves the single-workspace
+      // cockpit stage (documented transport mapping).
+      const workspaceId =
+        filter?.workspaceId ??
+        (await f<WireCollection<Workspace>>(withQuery(endpoints.workspaces(), {}))).items[0]
+          ?.id;
+      if (!workspaceId) return { items: [], nextCursor: null };
+      const detail = await f<WireWorkspaceDetail>(endpoints.workspace(workspaceId));
+      return {
+        items: (detail.recentActivity ?? []).map(mapWireAuditEvent),
+        nextCursor: null,
+      };
+    },
   };
 }
 

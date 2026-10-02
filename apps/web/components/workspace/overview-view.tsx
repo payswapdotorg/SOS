@@ -225,7 +225,7 @@ function SystemHealthLine({ systemId }: { systemId: string }) {
       <TruthStatePill state={r.stateSummary.health} withLabel={false} />
       <span>
         health · drift: {r.stateSummary.drift.toLowerCase()} · uncertainty:{" "}
-        {r.uncertainty.level.toLowerCase()} · rev {shortRevision(r.sourceRef.revision, 7)}
+        {r.uncertainty.state.toLowerCase()} · rev {shortRevision(r.sourceRef.revision, 7)}
       </span>
     </div>
   );

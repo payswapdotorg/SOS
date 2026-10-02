@@ -17,6 +17,10 @@ const COLUMN_ORDER: ArchitectureNode["kind"][] = [
   "COMPONENT",
   "DATA_STORE",
   "CAPABILITY",
+  "MODEL",
+  "POLICY",
+  "ADAPTER",
+  "EXTERNAL_DEPENDENCY",
   "TRUST_BOUNDARY",
 ];
 
@@ -63,6 +67,10 @@ const KIND_TONE: Record<ArchitectureNode["kind"], string> = {
   DEPLOYMENT: "fill-orange-50 stroke-orange-400",
   TRUST_BOUNDARY: "fill-rose-50 stroke-rose-400",
   CAPABILITY: "fill-emerald-50 stroke-emerald-400",
+  POLICY: "fill-cyan-50 stroke-cyan-400",
+  MODEL: "fill-lime-50 stroke-lime-400",
+  ADAPTER: "fill-indigo-50 stroke-indigo-400",
+  EXTERNAL_DEPENDENCY: "fill-fuchsia-50 stroke-fuchsia-400",
 };
 
 export function ArchitectureGraphView({ graph }: { graph: ArchitectureGraph }) {
