@@ -106,6 +106,44 @@ export interface User {
   createdAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Auth + tenancy (PUB-04) — session, account, memberships with roles
+// ---------------------------------------------------------------------------
+
+/** The provider that established the session (honestly labeled). */
+export type SessionProvider = "none" | "local-stub" | "github" | "fake-github";
+
+export interface SessionInfo {
+  authenticated: boolean;
+  user: User | null;
+  /** True for the LOCAL deterministic test identities (never in public). */
+  stub: boolean;
+  provider: SessionProvider;
+}
+
+/** One workspace membership of the signed-in user (owner | member). */
+export interface WorkspaceMembership {
+  id: string;
+  name: string;
+  slug: string;
+  isDemo: boolean;
+  createdAt: string;
+  role: "owner" | "member";
+}
+
+export interface AccountInfo {
+  authenticated: boolean;
+  user: User | null;
+  stub: boolean;
+  provider: SessionProvider;
+  workspaces: WorkspaceMembership[];
+}
+
+export interface CreateWorkspaceInput {
+  name: string;
+  slug: string;
+}
+
 export type MissionStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
 export interface Mission {

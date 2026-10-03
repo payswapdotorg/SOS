@@ -1,19 +1,25 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { DemoBadge } from "@/components/ui/badge";
-import { GithubMark } from "./github-mark";
 
 /**
  * Workspace top bar. The demo banner states the truth about fixture mode
  * (which API mode would be active otherwise) — never a fake "connected".
+ * PUB-04: the header accepts the workspace switcher (children) and the
+ * account menu (`accountSlot`) from the client shell bar.
  */
 export function WorkspaceHeader({
   workspaceName,
   demoMode,
   apiBase,
+  accountSlot = null,
+  children = null,
 }: {
   workspaceName: string;
   demoMode: boolean;
   apiBase: string | null;
+  accountSlot?: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -33,22 +39,18 @@ export function WorkspaceHeader({
             <p className="hidden text-xs text-slate-500 sm:block">Mission-governed software evolution</p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {children}
           {demoMode ? (
             <DemoBadge label="DEMO DATA" />
           ) : (
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-              API: {apiBase}
-            </span>
+            apiBase !== null && (
+              <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800 lg:inline">
+                API: {apiBase || "same-origin"}
+              </span>
+            )
           )}
-          <Link
-            href="/signin"
-            className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-surface hover:bg-slate-50"
-          >
-            <GithubMark className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign in with GitHub</span>
-            <span className="sm:hidden">Sign in</span>
-          </Link>
+          {accountSlot}
         </div>
       </div>
     </header>

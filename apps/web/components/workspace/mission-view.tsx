@@ -3,15 +3,15 @@
 import { useMemo, useState } from "react";
 import { Check, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useResource } from "@/hooks/use-resource";
+import { useWorkspaceSelection } from "@/hooks/use-workspace-selection";
 import { getSosClient } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 import type { Mission, MissionRevision } from "@/lib/api/types";
 import { Badge, DemoBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { ErrorState, LoadingState } from "@/components/ui/states";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
 import { formatTimestamp } from "@/lib/format";
-
-const WORKSPACE_ID = "ws_aurora_demo";
 
 type Stage = {
   key: "mission" | "goals" | "outcomes" | "stakeholders" | "measures" | "constraints" | "preferences" | "approve";
@@ -62,6 +62,8 @@ const emptyRow: Record<keyof Draft, () => Record<string, string>> = {
 export function MissionView() {
   const client = getSosClient();
   const isDemo = client.runtime.mode === "fixtures";
+  const selection = useWorkspaceSelection();
+  const workspaceId = selection.selected?.id ?? null;
   const [active, setActive] = useState<Stage["key"]>("mission");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -69,12 +71,23 @@ export function MissionView() {
   const [approvedAt, setApprovedAt] = useState<string | null>(null);
   const [approvedBy, setApprovedBy] = useState<string | null>(null);
 
-  const mission = useResource<Mission>((c) => c.getMission(WORKSPACE_ID), []);
+  const mission = useResource<Mission | null>(
+    async (c) => {
+      if (!workspaceId) return null;
+      try {
+        return await c.getMission(workspaceId);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return null;
+        throw error;
+      }
+    },
+    [workspaceId],
+  );
   const revision = useResource<MissionRevision | null>(async (c) => {
-    const m = await c.getMission(WORKSPACE_ID);
-    const revs = (await c.listMissionRevisions(m.id)).items;
-    return revs.find((r) => r.id === m.currentRevisionId) ?? revs[revs.length - 1] ?? null;
-  }, []);
+    if (!workspaceId || !mission.data) return null;
+    const revs = (await c.listMissionRevisions(mission.data.id)).items;
+    return revs.find((r) => r.id === mission.data?.currentRevisionId) ?? revs[revs.length - 1] ?? null;
+  }, [workspaceId, mission.data?.id]);
 
   const workingDraft = useMemo<Draft | null>(
     () => draft ?? (revision.data ? draftFromRevision(revision.data) : null),
@@ -140,6 +153,13 @@ export function MissionView() {
       {mission.isLoading || revision.isLoading ? <LoadingState label="Loading mission…" /> : null}
       {mission.error ? <ErrorState error={mission.error} onRetry={mission.refetch} /> : null}
       {revision.error ? <ErrorState error={revision.error} onRetry={revision.refetch} /> : null}
+
+      {!mission.isLoading && !mission.error && mission.data === null && workspaceId ? (
+        <EmptyState
+          title="No mission in this workspace yet"
+          hint="A fresh workspace starts empty. The mission journey (goals → outcomes → stakeholders → measures → constraints → preferences → approval) creates the first mission — a signed-in owner action against the API."
+        />
+      ) : null}
 
       {mission.data && revision.data && workingDraft ? (
         <div className="grid gap-4 lg:grid-cols-[13rem_1fr]">

@@ -3,29 +3,47 @@
 import Link from "next/link";
 import { AlertCircle, ArrowRight, Compass, Gauge } from "lucide-react";
 import { useResource } from "@/hooks/use-resource";
+import { useWorkspaceSelection } from "@/hooks/use-workspace-selection";
 import { getSosClient } from "@/lib/api/client";
+import { ApiError } from "@/lib/api/errors";
 import type { Decision, Mission, MissionRevision, System, SystemRevision } from "@/lib/api/types";
 import { Badge, DemoBadge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { DefinitionList, KeyValue } from "@/components/ui/key-value";
 import { TruthStatePill } from "@/components/ui/state-pill";
-import { ErrorState, LoadingState } from "@/components/ui/states";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
 import { formatTimestamp, shortRevision } from "@/lib/format";
 
-const WORKSPACE_ID = "ws_aurora_demo";
+/** A 404 (fresh workspace, no mission yet) is an honest empty, not an error. */
+async function missionOrNull(
+  c: ReturnType<typeof getSosClient>,
+  workspaceId: string,
+): Promise<Mission | null> {
+  try {
+    return await c.getMission(workspaceId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
 
 export function OverviewView() {
   const client = getSosClient();
   const isDemo = client.runtime.mode === "fixtures";
+  const selection = useWorkspaceSelection();
+  const workspaceId = selection.selected?.id ?? null;
 
-  const mission = useResource<Mission>((c) => c.getMission(WORKSPACE_ID), []);
+  const mission = useResource<Mission | null>(
+    (c) => (workspaceId ? missionOrNull(c, workspaceId) : Promise.resolve(null)),
+    [workspaceId],
+  );
   const revision = useResource<MissionRevision | null>(
     async (c) => {
-      const m = await c.getMission(WORKSPACE_ID);
-      const revisions = (await c.listMissionRevisions(m.id)).items;
-      return revisions.find((r) => r.id === m.currentRevisionId) ?? null;
+      if (!workspaceId || !mission.data) return null;
+      const revisions = (await c.listMissionRevisions(mission.data.id)).items;
+      return revisions.find((r) => r.id === mission.data?.currentRevisionId) ?? null;
     },
-    [],
+    [workspaceId, mission.data?.id],
   );
   const systems = useResource<System[]>((c) => c.listSystems().then((r) => r.items), []);
   const decisions = useResource<Decision[]>((c) => c.listDecisions().then((r) => r.items), []);
@@ -67,8 +85,20 @@ export function OverviewView() {
             }
           />
           <CardBody>
+            {selection.isLoading ? (
+              <LoadingState label="Loading workspace…" />
+            ) : null}
+            {selection.error ? (
+              <ErrorState error={selection.error} onRetry={selection.refetch} />
+            ) : null}
             {mission.isLoading ? <LoadingState label="Loading mission…" /> : null}
             {mission.error ? <ErrorState error={mission.error} onRetry={mission.refetch} /> : null}
+            {!mission.isLoading && !mission.error && mission.data === null && workspaceId ? (
+              <EmptyState
+                title="No mission yet"
+                hint="This workspace is fresh. A mission is created through the mission journey — goals, outcomes, stakeholders, measures, constraints, preferences — and approved by you as the owner."
+              />
+            ) : null}
             {mission.data && !mission.isLoading ? (
               <div>
                 <p className="text-base font-semibold text-slate-900">{mission.data.title}</p>

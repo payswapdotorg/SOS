@@ -131,11 +131,12 @@ describe("landing page", () => {
 });
 
 describe("sign-in page", () => {
-  test("explains the PUB-04 flow honestly in fixture mode", () => {
+  test("explains the OAuth flow honestly in fixture mode (PUB-04 landed)", () => {
     const html = render(createElement(SignInPage));
     expect(html).toContain("Demo mode");
-    expect(html).toContain("PUB-04");
-    expect(html).toContain("/api/v1/auth/github/start");
+    // PUB-04 landed: fixture mode now explains it needs a configured API
+    // (the copy no longer says "wired in PUB-04" — the flow IS wired).
+    expect(html).toContain("needs a configured API");
     expect(html).toContain("does not fake a login");
   });
 });
