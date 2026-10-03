@@ -1,7 +1,20 @@
-"""``/api/v1/jobs`` — thin routes. Idempotency keys dedup duplicate POSTs
-(coordination seam); job types: system_recovery (W3 recovery at a pinned
-ref), experiment_execution (the governed W11 dispatch). Directive §8 job
-fields exactly."""
+"""``/api/v1/jobs`` — thin routes over the PUB-06 job/coordination layer.
+
+POST /jobs: idempotent creation (duplicate keys return the SAME job, no
+duplicate side effects — durable unique index + coordination fast path);
+job types: system_recovery (W3 recovery at a pinned ref) and
+experiment_execution (the governed W11 dispatch). Directive §8 job fields
+exactly.
+
+Execution split (directive §8 / contract §D PUB-06): LOCAL mode runs the
+in-process bounded executor inline (deterministic tests); preview/public
+enqueues ONLY — the separate worker process
+(``python3 -m services.api.jobs.worker``) claims jobs through the
+orchestration locks and applies the bounded/jittered retry policy. The
+lifecycle: ``queued`` → ``running`` → ``succeeded`` | ``failed``; truthful
+non-SUCCESS outcomes are terminal results, never retried into fake
+success.
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -12,12 +25,12 @@ from ..dependencies import (
     audit_writer,
     cursor_param,
     get_container,
-    now_iso,
     require_authenticated,
     require_workspace_membership,
     tenant_scope,
 )
 from ..errors import not_found, validation
+from ..jobs import JobService
 from ..schemas.execution import CreateJobRequestDTO, JobDTO
 from ..schemas.common import CollectionEnvelope
 from providers.neon.seam import TenantScope  # noqa: E402
@@ -50,41 +63,37 @@ def create_job(
     container: ApiContainer = Depends(get_container),
     audit=Depends(audit_writer),
 ) -> dict:
-    from ..dependencies.rate_limit import check_job_quota, check_write_quota
+    from ..dependencies.rate_limit import check_write_quota
 
     if not scope.allows(body.workspace_id):
         raise not_found("workspace not found")
     require_workspace_membership(container, session, body.workspace_id)
     check_write_quota(container, session)
 
-    idempotency_key = body.idempotency_key or (
-        f"{body.type}:{body.workspace_id}:"
-        f"{body.experiment_id or ''}:{body.ref or ''}"
-    )
-    existing = container.persistence.get_job_by_idempotency_key(
-        scope, idempotency_key
-    )
-    if existing is not None:
-        # Idempotent replay: same key → same job, no duplicate side effects.
-        return _job_wire(existing)
-
-    check_job_quota(container, body.workspace_id, body.type)
-
-    if body.type == "experiment_execution":
-        row = _run_execution_job(
-            container=container, scope=scope, session=session,
-            workspace_id=body.workspace_id, experiment_id=body.experiment_id,
-            idempotency_key=idempotency_key, audit=audit,
+    # Route-level input validation (thin controller, §C.4): the job layer
+    # assumes a well-formed input and records failures as job states.
+    if body.type == "experiment_execution" and not body.experiment_id:
+        raise validation("experiment_execution jobs require experimentId")
+    if body.type == "system_recovery" and not body.repository_url:
+        raise validation(
+            "system_recovery jobs require repositoryUrl (recovery pins the "
+            "exact revision — never 'latest')"
         )
-        return _job_wire(row)
-    if body.type == "system_recovery":
-        row = _run_recovery_job(
-            container=container, scope=scope, session=session,
-            workspace_id=body.workspace_id, repository_url=body.repository_url,
-            ref=body.ref, idempotency_key=idempotency_key, audit=audit,
+
+    service = JobService(container)
+    created, row = service.create_job(
+        scope=scope, session=session, body=body, audit=audit
+    )
+    # LOCAL mode: the in-process bounded executor (tests/dev). PUBLIC and
+    # preview: enqueue only — zero job execution in the API process.
+    if (
+        container.settings.env == "local"
+        and str(row.get("status")) == "queued"
+    ):
+        row = service.execute_job(
+            scope=scope, job_row=row, session=session, audit=audit
         )
-        return _job_wire(row)
-    raise validation(f"unknown job type {body.type!r}")
+    return _job_wire(row)
 
 
 @router.get("/jobs/{job_id}", response_model=JobDTO)
@@ -97,220 +106,6 @@ def get_job(
     if row is None:
         raise not_found("job not found")
     return _job_wire(row)
-
-
-# -- job runners (LOCAL bounded in-process execution; PUB-06 adds the
-# separate worker process) -------------------------------------------------
-
-
-def _run_execution_job(
-    *,
-    container: ApiContainer,
-    scope: TenantScope,
-    session: SessionIdentity,
-    workspace_id: str,
-    experiment_id: str | None,
-    idempotency_key: str,
-    audit,
-) -> dict:
-    if not experiment_id:
-        raise validation(
-            "experiment_execution jobs require experimentId"
-        )
-    from ..routes.executions import dispatch_execution
-    from ..schemas.execution import DispatchExecutionRequestDTO
-
-    execution = dispatch_execution(
-        DispatchExecutionRequestDTO(
-            experiment_id=experiment_id, intent=""
-        ),
-        session=session, scope=scope, container=container, audit=audit,
-    )
-    receipt = execution["receipt"] or {}
-    job_id = "job-exec-" + str(execution["id"])
-    row = container.persistence.insert_job(
-        workspace_id=workspace_id, job_id=job_id,
-        payload={
-            "type": "experiment_execution",
-            "requestedBy": session.user_id,
-            "authoritySnapshot": {
-                "principal": session.display,
-                "provider": execution["provider"],
-            },
-            "inputHash": str(execution["requestHash"]),
-            "sourceRevision": receipt.get("sourceRevision", ""),
-            "provider": str(execution["provider"]),
-            "status": (
-                "succeeded"
-                if receipt.get("outcome", {}).get("state") == "SUCCESS"
-                else "failed"
-            ),
-            "startedAt": receipt.get("startedAt"),
-            "completedAt": receipt.get("finishedAt"),
-            "receipt": receipt,
-            "artifactRefs": list(execution.get("artifactRefs") or []),
-            "errorState": (
-                None
-                if receipt.get("outcome", {}).get("state") == "SUCCESS"
-                else str(receipt.get("outcome", {}).get("detail") or "")
-            ),
-            "idempotencyKey": idempotency_key,
-            "createdAt": now_iso(),
-        },
-    )
-    audit(
-        tenant_id=workspace_id, actor=session.display,
-        action="job.completed", target=f"job/{job_id}",
-        meta={"status": row["status"], "executionId": execution["id"]},
-        ts=now_iso(),
-    )
-    return row
-
-
-def _run_recovery_job(
-    *,
-    container: ApiContainer,
-    scope: TenantScope,
-    session: SessionIdentity,
-    workspace_id: str,
-    repository_url: str | None,
-    ref: str | None,
-    idempotency_key: str,
-    audit,
-) -> dict:
-    if not repository_url:
-        raise validation(
-            "system_recovery jobs require repositoryUrl (recovery pins the "
-            "exact revision — never 'latest')"
-        )
-    from ..orchestration import run_system_recovery
-    from ..routes.systems import _graph_wire
-    from providers.github.local import (
-        UnknownCommitError,
-        UnknownRepositoryError,
-    )
-    from sos.model import TruthState, TruthfulValue
-    from sos.evidence import EvidenceProvenance
-    from ..orchestration import (
-        DEMO_TRACEABILITY,
-        build_evidence_record,
-        evidence_domain_to_wire,
-    )
-
-    job_id = "job-recovery-" + (idempotency_key.replace(":", "-"))
-    try:
-        commit, recovery, state = run_system_recovery(
-            github=container.github, repository_url=repository_url,
-            ref=ref, fallback_revision=None,
-            traceability=DEMO_TRACEABILITY,
-        )
-    except UnknownRepositoryError as exc:
-        raise validation(str(exc)) from exc
-    except UnknownCommitError as exc:
-        raise validation(str(exc)) from exc
-
-    system_id = "sys-" + _slugish_url(repository_url)
-    revision_id = f"{system_id}-rev1"
-    existing_system = container.persistence.get_system(scope, system_id)
-    if existing_system is None:
-        container.persistence.insert_system(
-            workspace_id=workspace_id, system_id=system_id,
-            name=repository_url.rsplit("/", 1)[-1] or system_id,
-            mode="brownfield", current_revision_id=None,
-            created_at=now_iso(),
-        )
-    container.persistence.insert_system_revision(
-        system_id=system_id, revision_id=revision_id, revision=1,
-        payload={
-            "stateSummary": (
-                f"Recovered at pinned commit {commit.sha[:12]} via the W3 "
-                f"recovery pipeline ({len(state.architecture.nodes)} nodes, "
-                f"{len(state.architecture.edges)} edges)."
-            ),
-            "uncertainty": {
-                "state": state.architecture.uncertainty.state.value,
-                "reason": state.architecture.uncertainty.reason,
-                "confidence": state.architecture.uncertainty.confidence,
-            },
-            "sourceRef": {
-                "kind": "github",
-                "url": repository_url,
-                "revision": commit.sha,
-                "immutable": True,
-                "fixture": True,
-            },
-            "recovery": {"jobId": job_id, "status": "succeeded"},
-            "graph": _graph_wire(state.architecture),
-        },
-        created_at=now_iso(), set_current=True,
-    )
-    evidence = build_evidence_record(
-        kind="source_revision",
-        source_ref="architecture-recovery",
-        subject_ref=system_id,
-        result=TruthfulValue(
-            TruthState.SUCCESS,
-            {
-                "revision": commit.sha,
-                "filesClassified": len(recovery.inventory.files),
-                "nodesRecovered": len(state.architecture.nodes),
-            },
-            "system state recovered from the pinned commit",
-        ),
-        provenance=EvidenceProvenance(
-            source="architecture-recovery",
-            observed_subject=system_id,
-            timestamp=now_iso(),
-            environment=None,
-            implementation_revision=commit.sha,
-        ),
-        traceability=DEMO_TRACEABILITY,
-        evidence_id=f"ev-{job_id}",
-        timestamp=now_iso(),
-    )
-    container.persistence.insert_evidence(
-        workspace_id=workspace_id, evidence_id=f"ev-{job_id}",
-        payload=evidence_domain_to_wire(
-            evidence, evidence_id=f"ev-{job_id}",
-            workspace_id=workspace_id, system_id=system_id,
-            created_at=now_iso(),
-        ),
-    )
-    row = container.persistence.insert_job(
-        workspace_id=workspace_id, job_id=job_id,
-        payload={
-            "type": "system_recovery",
-            "requestedBy": session.user_id,
-            "authoritySnapshot": {
-                "principal": session.display, "workspaceRole": "member",
-            },
-            "inputHash": commit.sha[:16],
-            "sourceRevision": commit.sha,
-            "provider": "local",
-            "status": "succeeded",
-            "startedAt": now_iso(),
-            "completedAt": now_iso(),
-            "receipt": {
-                "performedBy": "sos.recovery.recover_repository",
-                "fixture": True,
-                "revision": commit.sha,
-                "systemRevisionId": revision_id,
-                "filesClassified": len(recovery.inventory.files),
-                "nodesRecovered": len(state.architecture.nodes),
-            },
-            "artifactRefs": [],
-            "errorState": None,
-            "idempotencyKey": idempotency_key,
-            "createdAt": now_iso(),
-        },
-    )
-    audit(
-        tenant_id=workspace_id, actor=session.display,
-        action="job.completed", target=f"job/{job_id}",
-        meta={"status": "succeeded", "systemRevisionId": revision_id},
-        ts=now_iso(),
-    )
-    return row
 
 
 def _job_wire(row: dict) -> dict:
@@ -331,11 +126,3 @@ def _job_wire(row: dict) -> dict:
         "errorState": row["error_state"],
         "createdAt": row["created_at"],
     }
-
-
-def _slugish_url(url: str) -> str:
-    import re as _re
-
-    tail = url.rstrip("/").rsplit("/", 1)[-1] or "repo"
-    slug = _re.sub(r"[^a-z0-9]+", "-", tail.lower()).strip("-")
-    return (slug or "repo")[:48]

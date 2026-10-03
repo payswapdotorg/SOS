@@ -102,6 +102,10 @@ services:
         value: "240"
       - key: SOS_RATE_WRITE_PER_MIN
         value: "30"
+      - key: SOS_RATE_WORKSPACE_PER_MIN
+        value: "600"           # per-workspace per-minute ceiling (PUB-06)
+      - key: SOS_RATE_PROVIDER_PER_MIN
+        value: "30"            # per-provider job dispatches per minute (PUB-06)
       - key: SOS_RATE_JOB_PER_HOUR
         value: "10"            # deliberately low expensive-job quota (Stage C)
       - key: SOS_RATE_RECOVERY_PER_HOUR
@@ -112,6 +116,97 @@ services:
         value: "1"             # S16 request payload cap
       - key: SOS_APIFY_MAX_CONCURRENT
         value: "2"             # S14 Apify low-concurrency semaphore
+      # --- job/coordination layer (PUB-06; directive §8 retry policy:
+      #     bounded, jittered, disclosed) ---
+      - key: SOS_JOB_MAX_ATTEMPTS
+        value: "3"
+      - key: SOS_JOB_BACKOFF_BASE_SECONDS
+        value: "1"
+      - key: SOS_JOB_BACKOFF_MAX_SECONDS
+        value: "30"
+      - key: SOS_JOB_TIMEOUT_SECONDS
+        value: "60"
+      - key: SOS_JOB_LEASE_SECONDS
+        value: "600"           # must exceed worst-case execution+backoff
     # LOCAL-only names (SOS_LOCAL_DB_PATH / SOS_LOCAL_ARTIFACTS_DIR) are
     # intentionally NOT wired here: this service is the PUBLIC deployment;
     # LOCAL state paths are CI/development concerns with code defaults.
+
+  - type: worker
+    name: sos-job-worker
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: services/api
+    buildCommand: pip install --upgrade pip && pip install -e '../..[api]'
+    # PUB-06 job worker: a SEPARATE process from the API. The web service
+    # only ENQUEUES jobs (POST /jobs returns the queued DTO — zero job
+    # execution in the API process); this worker claims queued jobs through
+    # the Upstash orchestration locks and runs them with the bounded retry
+    # policy (directive §8). PYTHONPATH mirrors the web service's
+    # --app-dir ../.. (the repo root must be importable for
+    # services.*/providers.*; `sos` comes from the editable install).
+    startCommand: PYTHONPATH=../.. python3 -m services.api.jobs.worker --poll 5 --limit 10
+    autoDeploy: true
+    envVars:
+      # Same provider wiring as the web service (both processes share the
+      # Neon database, the Upstash coordination plane and the R2 store).
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: SOS_ENV
+        value: public
+      - key: SOS_PERSISTENCE
+        value: neon
+      - key: SOS_COORDINATION
+        value: upstash
+      - key: SOS_ARTIFACTS
+        value: r2
+      - key: SOS_EXECUTION
+        value: demo            # PUB-08 flips to apify when the actor is live
+      - key: SOS_API_BASE_URL
+        sync: false
+      - key: SOS_WEB_BASE_URL
+        sync: false
+      - key: SOS_DATABASE_URL
+        sync: false            # Neon PUBLIC branch (postgresql+asyncpg://…)
+      - key: SOS_REDIS_URL
+        sync: false            # Upstash Redis (rediss://…:6379)
+      - key: SOS_R2_ENDPOINT
+        sync: false
+      - key: SOS_R2_ACCESS_KEY_ID
+        sync: false
+      - key: SOS_R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: SOS_R2_BUCKET
+        sync: false
+      - key: SOS_SESSION_SECRET
+        sync: false            # 32+ random bytes (fail-closed without it)
+      - key: SOS_JOB_CALLBACK_SECRET
+        sync: false            # HMAC secret for provider callbacks (PUB-08)
+      - key: SOS_APIFY_TOKEN
+        sync: false            # required only when SOS_EXECUTION=apify
+      - key: SOS_APIFY_ACTOR_ID
+        sync: false
+      - key: SOS_GITHUB_SOURCE_PAT
+        sync: false            # optional read-scoped source adapter token
+      - key: SOS_RATE_WORKSPACE_PER_MIN
+        value: "600"
+      - key: SOS_RATE_PROVIDER_PER_MIN
+        value: "30"
+      - key: SOS_RATE_JOB_PER_HOUR
+        value: "10"
+      - key: SOS_RATE_RECOVERY_PER_HOUR
+        value: "2"
+      - key: SOS_RATE_BODY_MAX_MB
+        value: "1"
+      - key: SOS_JOB_MAX_ATTEMPTS
+        value: "3"
+      - key: SOS_JOB_BACKOFF_BASE_SECONDS
+        value: "1"
+      - key: SOS_JOB_BACKOFF_MAX_SECONDS
+        value: "30"
+      - key: SOS_JOB_TIMEOUT_SECONDS
+        value: "60"
+      - key: SOS_JOB_LEASE_SECONDS
+        value: "600"
