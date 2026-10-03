@@ -74,8 +74,11 @@ def create_app(
     )
     app.state.container = container
 
-    # Migrations + deterministic demo seed (idempotent; LOCAL persistence).
-    if seed and container.persistence.mode == "local":
+    # Migrations + deterministic demo seed (idempotent) — BOTH persistence
+    # backends (PUB-05: SQLite LOCAL and Neon PostgreSQL load the same demo
+    # dataset through the same seam; a fresh Neon branch bootstraps exactly
+    # like a fresh LOCAL database).
+    if seed:
         container.persistence.migrate()
         if not container.persistence.is_seeded():
             from db.seeds.demo_seed import seed_demo
@@ -107,7 +110,8 @@ def _build_adapters(
     execution_providers: dict[str, Any] | None = None,
     github: Any = None,
 ) -> dict[str, Any]:
-    # Persistence: LOCAL SQLite | Neon (fail-closed placeholder, PUB-05).
+    # Persistence: LOCAL SQLite | Neon PostgreSQL (PUB-05: asyncpg adapter
+    # on the same seam; fail-closed on invalid config — never a fallback).
     if persistence is not None:
         pass
     elif settings.persistence_mode == "local":

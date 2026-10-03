@@ -55,6 +55,14 @@ class Page:
     next_cursor: str | None
 
 
+class ConflictError(Exception):
+    """Raised when an insert violates a uniqueness invariant (409 CONFLICT).
+
+    Shared by BOTH persistence implementations (SQLite LOCAL / Neon
+    PostgreSQL — PUB-05); re-exported from ``providers.neon.local`` for the
+    existing import sites (routes wire it to the ``CONFLICT`` error code)."""
+
+
 class PersistencePort(Protocol):
     """The provider-neutral persistence interface (LOCAL SQLite now, Neon in
     PUB-05 — same interface, tenant scoping enforced in the adapter)."""
