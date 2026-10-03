@@ -216,7 +216,28 @@ PUB-05-precise error); `tools/final_gate_check.py` untouched;
    performs the parent lookup then the page query (two round-trips on
    Neon vs one on SQLite) — mirrored 1:1 from the PUB-01 SQLite adapter
    to keep semantics identical; harmless at demo scale.
-5. No external credential was needed for this item (LOCAL `pg` +
+5. **CI pub-workflow outcome (the pre-disclosed env-drift finding,
+   NOT a PUB-05 regression):** the PR's `pub` python-gates job (which
+   installs the LATEST `fastapi>=0.115`/`pydantic>=2.7` from the index —
+   currently newer than the recorded-snapshot environment) failed exactly
+   ONE test: `test_pub01_openapi_snapshot.py::
+   test_openapi_is_deterministic_and_snapshotted` (637 passed / 1 failed /
+   38 skipped). This is the PUB-03 checkpoint's standing pre-disclosed
+   env-drift digest finding (its review record: "the pre-disclosed
+   env-drift digest finding ONLY, identical at pristine base;
+   OPENAPI_SNAPSHOT_SHA256 NOT changed per instruction; fastapi
+   0.142.2/pydantic 2.13.5"). Pristine-base proof for THIS item: the
+   snapshot test passes at the pristine base `3eeefad` AND at the head
+   `dd5881b` in the SAME local environment (fastapi 0.128.0/pydantic
+   2.12.5), and the OpenAPI document digest is byte-identical between
+   base and head — PUB-05 changed NO route/schema (the only
+   `services/api` change is the persistence seeding gate). The snapshot
+   test is frozen surface for PUB-05 (existing test file) — the digest
+   update is a wire-contract-owner decision after review, per the PUB-03
+   precedent. The BINDING frozen `tests` workflow is GREEN on this exact
+   head (both runs completed/success), and the full local §G matrix at
+   the head is green (676 passed).
+6. No external credential was needed for this item (LOCAL `pg` +
    asyncpg only). Nothing was blocked: **no WAITING_FOR_CAPACITY state.**
 
 ## Explicit statements (dispatch law)
