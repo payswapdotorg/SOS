@@ -1,18 +1,24 @@
 """Rate limiting middleware (directive §13 buckets) behind the coordination
-seam — LOCAL in-process limiter now; the PUB-06 Upstash adapter carries the
-identical semantics.
+seam — the PUB-06 Upstash adapter carries the same epoch-aligned fixed-
+window semantics as the LOCAL in-process limiter.
 
 Buckets (per directive §13 + infra/environment.example):
 - ``ip``: a coarse per-IP per-minute ceiling over ALL requests;
 - ``anonymous``: per-IP per-minute for anonymous (demo-reads-only) traffic;
 - ``user``: per-authenticated-user per-minute for normal reads;
 - ``write``: per-user per-minute for mutations (checked by mutation routes);
-- ``job``/``recovery``: per-workspace per-hour expensive-job quotas (checked
-  at job creation);
-- provider concurrency: the execution dispatch semaphore (PUB-06/PUB-08).
+- ``workspace``: per-workspace per-minute ceiling on requests that target
+  an identifiable workspace (query ``workspaceId`` or a
+  ``/workspaces/{id}`` path) — the shared-workspace abuse guard;
+- ``job-type``/``recovery``: per-workspace per-hour expensive-job quotas
+  (checked at job creation);
+- ``provider``: per-provider per-minute dispatch quota (checked at job
+  creation — PUB-06, directive §13 "provider" bucket); the Apify
+  low-concurrency SEMAPHORE is PUB-08's ``apify_max_concurrent``.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -24,6 +30,10 @@ from ..errors import error_body, CODE_RATE_LIMITED
 
 _BODY_MAX_DEFAULT = 1 * 1024 * 1024
 
+# Workspace-target extraction: a ``/api/v1/workspaces/{id}`` path prefix
+# (the first path segment pair under /api/v1).
+_WORKSPACE_PATH_RE = re.compile(r"^/api/v1/workspaces/([^/?#]+)")
+
 
 def _client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
@@ -31,6 +41,20 @@ def _client_ip(request: Request) -> str:
         return forwarded.split(",")[0].strip()
     client = request.client
     return client.host if client else "unknown"
+
+
+def _target_workspace_id(request: Request) -> str | None:
+    """The workspace a request targets, when identifiable: the explicit
+    ``workspaceId`` query parameter (collection narrowing) or a
+    ``/workspaces/{id}`` path. Requests without an identifiable target are
+    covered by the ip/identity buckets only (disclosed behavior)."""
+    workspace_id = request.query_params.get("workspaceId")
+    if workspace_id:
+        return workspace_id
+    match = _WORKSPACE_PATH_RE.match(request.url.path)
+    if match:
+        return match.group(1)
+    return None
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -108,6 +132,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not decision.allowed:
             return self._too_many(decision.retry_after_seconds)
 
+        # Directive §13 workspace bucket: per-workspace per-minute ceiling
+        # on requests targeting an identifiable workspace (shared-workspace
+        # abuse guard; anonymous demo traffic shares the demo workspace's
+        # bucket — free-tier protection by design).
+        target_workspace = _target_workspace_id(request)
+        if target_workspace is not None:
+            try:
+                decision = coordination.rate_limit(
+                    "workspace", target_workspace,
+                    limit=settings.rate_workspace_per_min, window_seconds=60,
+                )
+            except Exception as exc:
+                return self._coordination_down(str(exc))
+            if not decision.allowed:
+                return self._too_many(decision.retry_after_seconds)
+
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(decision.limit)
         response.headers["X-RateLimit-Remaining"] = str(decision.remaining)
@@ -162,6 +202,20 @@ def check_job_quota(container: Any, workspace_id: str, job_type: str) -> None:
     decision = container.coordination.rate_limit(
         "job-type", f"{workspace_id}:{job_type}",
         limit=limit, window_seconds=3600,
+    )
+    if not decision.allowed:
+        from ..errors import rate_limited
+
+        raise rate_limited(decision.retry_after_seconds)
+
+
+def check_provider_quota(container: Any, provider: str) -> None:
+    """The §13 provider bucket: per-provider per-minute dispatch quota
+    (PUB-06 — checked at job creation; the execution provider's dispatches
+    are bounded per provider id, LOCAL demo and PUBLIC Apify alike)."""
+    decision = container.coordination.rate_limit(
+        "provider", str(provider),
+        limit=container.settings.rate_provider_per_min, window_seconds=60,
     )
     if not decision.allowed:
         from ..errors import rate_limited

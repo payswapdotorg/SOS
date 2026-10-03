@@ -52,7 +52,7 @@ The generated schema is snapshot-tested (`tests/test_pub01_openapi_snapshot.py`)
 | GET/POST | `/api/v1/executions` | POST = the governed W11 dispatch (authority gates BEFORE any provider call); receipts demo:true |
 | GET | `/api/v1/executions/{id}` | |
 | GET | `/api/v1/learning`, `/api/v1/memory` | learning records / architecture memory |
-| GET/POST | `/api/v1/jobs` | directive §8 fields; idempotency keys dedup; types: `system_recovery`, `experiment_execution` |
+| GET/POST | `/api/v1/jobs` | directive §8 fields; idempotency keys dedup (same key → same job, no duplicate side effects); types: `system_recovery`, `experiment_execution`; status lifecycle `queued → running → succeeded/failed` (PUB-06). LOCAL executes inline (bounded); preview/public ENQUEUE only — the separate worker process executes (see [jobs.md](jobs.md)) |
 | GET | `/api/v1/jobs/{id}` | |
 | GET | `/api/v1/providers/status` | truthful per-seam introspection (mode, implementation, status, capabilities, demo flag) |
 | GET | `/api/v1/providers/status/{name}` | |

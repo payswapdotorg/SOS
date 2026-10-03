@@ -57,6 +57,16 @@ class Settings:
     apify_max_concurrent: int
     local_db_path: str
     local_artifacts_dir: str
+    # -- PUB-06 job/coordination layer (directive §8: bounded, jittered,
+    #    disclosed retry; lease bounds the orchestration lock). Defaults keep
+    #    every pre-PUB-06 construction site valid (backward-compatible). ----
+    rate_workspace_per_min: int = 600
+    rate_provider_per_min: int = 30
+    job_max_attempts: int = 3
+    job_backoff_base_seconds: int = 1
+    job_backoff_max_seconds: int = 30
+    job_timeout_seconds: int = 60
+    job_lease_seconds: int = 600
 
 
 def _mode(environ: Mapping[str, str], name: str, default: str,
@@ -186,6 +196,12 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         rate_write_per_min=_positive_int(
             env_map, "SOS_RATE_WRITE_PER_MIN", 30
         ),
+        rate_workspace_per_min=_positive_int(
+            env_map, "SOS_RATE_WORKSPACE_PER_MIN", 600
+        ),
+        rate_provider_per_min=_positive_int(
+            env_map, "SOS_RATE_PROVIDER_PER_MIN", 30
+        ),
         rate_job_per_hour=_positive_int(env_map, "SOS_RATE_JOB_PER_HOUR", 10),
         rate_recovery_per_hour=_positive_int(
             env_map, "SOS_RATE_RECOVERY_PER_HOUR", 2
@@ -196,6 +212,22 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         rate_body_max_mb=_positive_int(env_map, "SOS_RATE_BODY_MAX_MB", 1),
         apify_max_concurrent=_positive_int(
             env_map, "SOS_APIFY_MAX_CONCURRENT", 2
+        ),
+        # PUB-06 job layer (directive §8: bounded, jittered, disclosed)
+        job_max_attempts=_positive_int(
+            env_map, "SOS_JOB_MAX_ATTEMPTS", 3
+        ),
+        job_backoff_base_seconds=_positive_int(
+            env_map, "SOS_JOB_BACKOFF_BASE_SECONDS", 1
+        ),
+        job_backoff_max_seconds=_positive_int(
+            env_map, "SOS_JOB_BACKOFF_MAX_SECONDS", 30
+        ),
+        job_timeout_seconds=_positive_int(
+            env_map, "SOS_JOB_TIMEOUT_SECONDS", 60
+        ),
+        job_lease_seconds=_positive_int(
+            env_map, "SOS_JOB_LEASE_SECONDS", 600
         ),
         local_db_path=(
             env_map.get("SOS_LOCAL_DB_PATH", "").strip()

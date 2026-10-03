@@ -70,11 +70,27 @@ SOS_GITHUB_SOURCE_PAT=
 SOS_RATE_ANON_PER_MIN=60          # anonymous: demo reads only
 SOS_RATE_USER_PER_MIN=240         # authenticated normal reads
 SOS_RATE_WRITE_PER_MIN=30         # authenticated bounded writes
+SOS_RATE_WORKSPACE_PER_MIN=600    # per-workspace per-minute ceiling (PUB-06)
+SOS_RATE_PROVIDER_PER_MIN=30      # per-provider job dispatches per minute (PUB-06)
 SOS_RATE_JOB_PER_HOUR=10          # expensive job quota per workspace
 SOS_RATE_RECOVERY_PER_HOUR=2      # repository recovery jobs per workspace
 SOS_RATE_ARTIFACT_MAX_MB=50       # artifact upload size cap (S15)
 SOS_RATE_BODY_MAX_MB=1            # request payload cap (S16)
 SOS_APIFY_MAX_CONCURRENT=2        # Apify low-concurrency semaphore (S14)
+
+# ---------------------------------------------------------------------------
+# Job/coordination layer (PUB-06 — directive §8: bounded, jittered,
+# disclosed retry; the lease bounds the orchestration lock TTL). The job
+# worker runs `python3 -m services.api.jobs.worker` as a SEPARATE process
+# in preview/public (see infra/render.yaml); LOCAL mode executes jobs
+# inline through the in-process bounded executor.
+# ---------------------------------------------------------------------------
+SOS_JOB_MAX_ATTEMPTS=3            # bounded attempts per job
+SOS_JOB_BACKOFF_BASE_SECONDS=1    # backoff = min(max, base * 2^(attempt-1))
+SOS_JOB_BACKOFF_MAX_SECONDS=30    # backoff cap; sleep is full-jitter [0, backoff]
+SOS_JOB_TIMEOUT_SECONDS=60        # per-attempt time bound for job operations
+SOS_JOB_LEASE_SECONDS=600         # orchestration-lock lease (must exceed the
+                                  # worst-case execution+backoff window)
 
 # ---------------------------------------------------------------------------
 # LOCAL-mode state locations (PUB-01 additive names; defaults live OUTSIDE
