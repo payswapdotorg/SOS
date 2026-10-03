@@ -1,4 +1,6 @@
-"""LOCAL persistence adapter: SQLite via the ``db/``-managed schema (PUB-01).
+"""LOCAL persistence adapter: SQLite via the ``db/``-managed schema (PUB-01;
+normalized-row projection through the shared ``db/mapping`` module landed
+with PUB-05).
 
 Truth rules enforced here:
 
@@ -7,6 +9,13 @@ Truth rules enforced here:
 - stored ``status`` truth states are passed through verbatim (six-state
   vocabulary; no conversion anywhere in the seam);
 - cursor pagination is deterministic (``ORDER BY created_at, id``).
+
+PUB-05: the entity mapping (registries + decomposition/reassembly) lives in
+``db/mapping.py`` — the SINGLE mapping authority shared with the Neon
+adapter — and every ``insert_*`` write projects the payload's decomposed
+content into the normalized §11 tables (architecture nodes/edges, evidence
+artifacts, causal hypotheses, candidate evaluations, assurance results,
+experiment events, execution requests/receipts) in the same transaction.
 """
 from __future__ import annotations
 
@@ -18,74 +27,30 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from .seam import Page, SeamHealth, TenantScope
+from .seam import ConflictError, Page, SeamHealth, TenantScope
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from db.mapping import (  # noqa: E402
+    JSON_COLUMNS as _JSON_COLUMNS,
+    PARENT_LINKS as _PARENT_LINKS,
+    TENANT_TABLES as _TENANT_TABLES,
+    assurance_result_rows,
+    candidate_evaluation_rows,
+    causal_hypothesis_row,
+    encode_row,
+    evidence_artifact_row,
+    execution_receipt_row,
+    execution_request_row,
+    experiment_event_rows,
+    graph_boundary_contract_rows,
+    graph_edge_rows,
+    graph_node_rows,
+    snake_case as _snake,
+)
 from db.runner import migrate_down, migrate_up  # noqa: E402
-
-_JSON_COLUMNS: dict[str, frozenset[str]] = {
-    "mission_revisions": frozenset({
-        "goals", "outcomes", "stakeholders", "measures", "constraints",
-        "preferences", "approval",
-    }),
-    "system_revisions": frozenset({
-        "uncertainty", "source_ref", "recovery", "graph",
-    }),
-    "evidence": frozenset({"provenance", "result"}),
-    "hypotheses": frozenset({"causal", "evidence_refs"}),
-    "candidates": frozenset({
-        "subgraph_replacement", "effects", "costs", "risks", "constraints",
-        "evidence_refs", "reversibility", "evaluation",
-    }),
-    "assurance_runs": frozenset({"checks"}),
-    "decisions": frozenset({
-        "evidence_refs", "authority_snapshot", "expected_impact",
-        "reversibility", "required_approvals", "ask_payload",
-    }),
-    "experiments": frozenset({"events"}),
-    "executions": frozenset({"receipt", "artifact_refs"}),
-    "learning_records": frozenset({
-        "context", "predicted_effects", "actual_effects", "uncertainty",
-        "lessons",
-    }),
-    "memory_entries": frozenset({
-        "context", "predicted_effects", "actual_effects", "uncertainty",
-        "lessons",
-    }),
-    "jobs": frozenset({
-        "authority_snapshot", "receipt", "artifact_refs",
-    }),
-    "audit_events": frozenset({"meta"}),
-}
-
-# Tables whose rows carry a tenant (workspace) column — scope-filtered reads.
-_TENANT_TABLES: dict[str, str] = {
-    "workspaces": "id",
-    "missions": "workspace_id",
-    "mission_revisions": "mission_id",
-    "systems": "workspace_id",
-    "system_revisions": "system_id",
-    "evidence": "workspace_id",
-    "hypotheses": "workspace_id",
-    "candidates": "workspace_id",
-    "assurance_runs": "workspace_id",
-    "decisions": "workspace_id",
-    "authorizations": "workspace_id",
-    "experiments": "workspace_id",
-    "executions": "workspace_id",
-    "learning_records": "workspace_id",
-    "memory_entries": "workspace_id",
-    "jobs": "tenant_id",
-}
-
-# Child tables joined through their parent for scope resolution.
-_PARENT_LINKS: dict[str, tuple[str, str, str]] = {
-    "mission_revisions": ("missions", "mission_id", "workspace_id"),
-    "system_revisions": ("systems", "system_id", "workspace_id"),
-}
 
 
 def encode_cursor(created_at: str, entity_id: str) -> str:
@@ -152,6 +117,24 @@ class LocalSqlitePersistence:
             else:
                 item[key] = value
         return item
+
+    def _insert_rows(self, table: str, rows: list[dict[str, Any]]) -> None:
+        """Insert mapping rows (PUB-05 normalized projection): JSON columns
+        encoded via the shared ``encode_row`` (byte-identical on both
+        backends); no-op on an empty projection."""
+        if not rows:
+            return
+        columns = list(rows[0].keys())
+        placeholders = ", ".join("?" for _ in columns)
+        sql = (
+            f"INSERT INTO {table} ({', '.join(columns)}) "
+            f"VALUES ({placeholders})"
+        )
+        with self._lock:
+            self._conn.executemany(
+                sql, [tuple(encode_row(table, r).values()) for r in rows]
+            )
+            self._conn.commit()
 
     def _scope_clause(self, table: str, scope: TenantScope) -> tuple[str, tuple[str, ...]]:
         """The tenant-scope WHERE fragment for a tenant table (S5)."""
@@ -457,6 +440,32 @@ class LocalSqlitePersistence:
             "SELECT * FROM system_revisions WHERE id = ?", (revision_id,)
         )
         assert row is not None
+        # PUB-05 normalized projection: the graph document decomposes into
+        # architecture_nodes/architecture_edges rows (same transaction).
+        parent = self._fetchone(
+            "SELECT workspace_id FROM systems WHERE id = ?", (system_id,)
+        )
+        if parent is not None:
+            workspace_id = parent["workspace_id"]
+            graph = payload["graph"] or {}
+            self._insert_rows(
+                "architecture_nodes",
+                graph_node_rows(
+                    workspace_id, system_id, revision_id, graph, created_at
+                ),
+            )
+            self._insert_rows(
+                "architecture_edges",
+                graph_edge_rows(
+                    workspace_id, system_id, revision_id, graph, created_at
+                ),
+            )
+            self._insert_rows(
+                "architecture_boundary_contracts",
+                graph_boundary_contract_rows(
+                    workspace_id, system_id, revision_id, graph, created_at
+                ),
+            )
         return self._row_to_dict("system_revisions", row)
 
     # -- evidence ----------------------------------------------------------------
@@ -512,6 +521,11 @@ class LocalSqlitePersistence:
         )
         row = self._fetchone("SELECT * FROM evidence WHERE id = ?", (evidence_id,))
         assert row is not None
+        # PUB-05 normalized projection: artifact metadata row (bytes stay in
+        # the artifact store — never in the DB).
+        artifact = evidence_artifact_row(workspace_id, evidence_id, payload)
+        if artifact is not None:
+            self._insert_rows("evidence_artifacts", [artifact])
         return self._row_to_dict("evidence", row)
 
     # -- hypotheses / candidates / assurance --------------------------------------
@@ -538,6 +552,10 @@ class LocalSqlitePersistence:
         )
         row = self._fetchone("SELECT * FROM hypotheses WHERE id = ?", (hypothesis_id,))
         assert row is not None
+        # PUB-05 normalized projection: the causal claim columnarized.
+        causal = causal_hypothesis_row(workspace_id, hypothesis_id, payload)
+        if causal is not None:
+            self._insert_rows("causal_hypotheses", [causal])
         return self._row_to_dict("hypotheses", row)
 
     def list_candidates(self, scope: TenantScope, *, workspace_id: str | None,
@@ -570,6 +588,13 @@ class LocalSqlitePersistence:
         )
         row = self._fetchone("SELECT * FROM candidates WHERE id = ?", (candidate_id,))
         assert row is not None
+        # PUB-05 normalized projection: objectives + Pareto-front rows.
+        self._insert_rows(
+            "candidate_evaluations",
+            candidate_evaluation_rows(
+                workspace_id, candidate_id, payload["evaluation"] or {}
+            ),
+        )
         return self._row_to_dict("candidates", row)
 
     def get_candidate(self, scope: TenantScope,
@@ -618,6 +643,14 @@ class LocalSqlitePersistence:
         )
         row = self._fetchone("SELECT * FROM assurance_runs WHERE id = ?", (assurance_id,))
         assert row is not None
+        # PUB-05 normalized projection: one assurance_results row per gate.
+        self._insert_rows(
+            "assurance_results",
+            assurance_result_rows(
+                workspace_id, assurance_id, payload["candidateId"],
+                checks_doc, payload["createdAt"],
+            ),
+        )
         return self._row_to_dict("assurance_runs", row)
 
     def get_assurance(self, scope: TenantScope,
@@ -737,6 +770,11 @@ class LocalSqlitePersistence:
         )
         row = self._fetchone("SELECT * FROM experiments WHERE id = ?", (experiment_id,))
         assert row is not None
+        # PUB-05 normalized projection: the lifecycle event log as rows.
+        self._insert_rows(
+            "experiment_events",
+            experiment_event_rows(workspace_id, experiment_id, events_doc),
+        )
         return self._row_to_dict("experiments", row)
 
     def get_experiment(self, scope: TenantScope,
@@ -789,6 +827,14 @@ class LocalSqlitePersistence:
         )
         row = self._fetchone("SELECT * FROM executions WHERE id = ?", (execution_id,))
         assert row is not None
+        # PUB-05 normalized projection: execution request + receipt rows.
+        self._insert_rows(
+            "execution_requests",
+            [execution_request_row(workspace_id, execution_id, payload)],
+        )
+        receipt = execution_receipt_row(workspace_id, execution_id, payload)
+        if receipt is not None:
+            self._insert_rows("execution_receipts", [receipt])
         return self._row_to_dict("executions", row)
 
     def get_execution(self, scope: TenantScope,
@@ -978,25 +1024,3 @@ class LocalSqlitePersistence:
         return self._row_to_dict("audit_events", row)
 
 
-class ConflictError(Exception):
-    """Raised when an insert violates a uniqueness invariant (409 CONFLICT)."""
-
-
-_SNAKE_OVERRIDES: dict[str, str] = {
-    "requestedBy": "requested_by",
-    "authoritySnapshot": "authority_snapshot",
-    "inputHash": "input_hash",
-    "sourceRevision": "source_revision",
-    "startedAt": "started_at",
-    "completedAt": "completed_at",
-    "artifactRefs": "artifact_refs",
-    "errorState": "error_state",
-    "idempotencyKey": "idempotency_key",
-}
-
-
-def _snake(camel: str) -> str:
-    if camel in _SNAKE_OVERRIDES:
-        return _SNAKE_OVERRIDES[camel]
-    out = "".join(("_" + ch.lower()) if ch.isupper() else ch for ch in camel)
-    return out if out else camel
