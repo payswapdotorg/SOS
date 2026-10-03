@@ -26,6 +26,7 @@ import {
   type WireWorkspaceDetail,
 } from "./wire";
 import type {
+  AccountInfo,
   ActivityEvent,
   ApiErrorEnvelope,
   ArchitectureGraph,
@@ -34,6 +35,7 @@ import type {
   Authorization,
   Candidate,
   Collection,
+  CreateWorkspaceInput,
   Decision,
   DemoDataset,
   Evidence,
@@ -47,6 +49,7 @@ import type {
   MemoryEntry,
   Mission,
   MissionRevision,
+  SessionInfo,
   System,
   SystemRevision,
   TruthState,
@@ -144,6 +147,70 @@ function notFound(what: string): ApiError {
 }
 
 // ---------------------------------------------------------------------------
+// Auth + tenancy (PUB-04): CSRF double-submit header + session helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * The readable CSRF cookie the API issues at sign-in (non-httpOnly BY
+ * DESIGN — the browser echoes it in the `x-sos-csrf` mutation header;
+ * SECURITY S6 double-submit). Reading it is safe in any environment.
+ */
+export const CSRF_COOKIE_NAME = "sos_csrf";
+
+export function readCsrfToken(): string | null {
+  if (typeof document === "undefined") return null; // SSR/prerender
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${CSRF_COOKIE_NAME}=`));
+  return match ? decodeURIComponent(match.slice(CSRF_COOKIE_NAME.length + 1)) : null;
+}
+
+/**
+ * Headers every MUTATION request carries (forward-ready: the API enforces
+ * the pair on real-session mutations; the client always sends it).
+ */
+export function mutationHeaders(): Record<string, string> {
+  const token = readCsrfToken();
+  return token ? { "x-sos-csrf": token } : {};
+}
+
+/**
+ * The browser-navigation URL that starts the GitHub OAuth flow. A plain
+ * navigation (never fetch): the API redirects to the provider and back,
+ * then lands on the cockpit callback page. `next` is a RELATIVE path
+ * (open-redirect guard mirrors the API's).
+ */
+export function githubStartUrl(runtime: ClientRuntime, next = "/workspace"): string {
+  const safeNext = isSafeRelativePath(next) ? next : "/workspace";
+  return buildUrl(runtime, `${endpoints.auth.githubStart()}?next=${encodeURIComponent(safeNext)}`);
+}
+
+/** A relative path only — the same guard the API enforces on `next`. */
+export function isSafeRelativePath(path: string): boolean {
+  return (
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !path.includes("\\") &&
+    path.length <= 200
+  );
+}
+
+function wireSessionToSessionInfo(payload: {
+  authenticated: boolean;
+  user: unknown;
+  stub: boolean;
+  provider: string;
+} | Record<string, unknown>): SessionInfo {
+  const body = payload as { authenticated?: unknown; user?: unknown; stub?: unknown; provider?: unknown };
+  return {
+    authenticated: Boolean(body.authenticated),
+    user: (body.user as User | null) ?? null,
+    stub: Boolean(body.stub),
+    provider: (body.provider as SessionInfo["provider"]) ?? "none",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The client
 // ---------------------------------------------------------------------------
 
@@ -163,6 +230,10 @@ export interface CollectionFilter {
 export interface SosClient {
   runtime: ClientRuntime;
   health(): Promise<Health>;
+  session(): Promise<SessionInfo>;
+  account(): Promise<AccountInfo>;
+  logout(): Promise<{ ok: boolean }>;
+  createWorkspace(input: CreateWorkspaceInput): Promise<Workspace>;
   me(): Promise<User>;
   listWorkspaces(filter?: CollectionFilter): Promise<Collection<Workspace>>;
   getWorkspace(id: string): Promise<Workspace>;
@@ -271,7 +342,37 @@ function createApiClient(runtime: ClientRuntime): SosClient {
   return {
     runtime,
     health: () => f<Health>(endpoints.health()),
-    me: () => f<User>(endpoints.me()),
+    session: async () =>
+      wireSessionToSessionInfo(
+        await f<Record<string, unknown>>(endpoints.auth.session()),
+      ),
+    account: () => f<AccountInfo>(endpoints.auth.account()),
+    logout: () =>
+      f<{ ok: boolean }>(endpoints.auth.logout(), {
+        method: "POST",
+        headers: { ...mutationHeaders() },
+      }),
+    createWorkspace: (input) =>
+      f<Workspace>(endpoints.workspaces(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...mutationHeaders() },
+        body: JSON.stringify(input),
+      }),
+    me: async () => {
+      // GET /me ships the SessionDTO wire shape — map honestly (an
+      // unauthenticated session has no user; transport mapping only).
+      const session = wireSessionToSessionInfo(
+        await f<Record<string, unknown>>(endpoints.me()),
+      );
+      if (!session.user) {
+        throw new ApiError({
+          message: "No signed-in user (anonymous session)",
+          code: "UNAUTHENTICATED",
+          status: 401,
+        });
+      }
+      return session.user;
+    },
     listWorkspaces: (filter) =>
       f<Collection<Workspace>>(withQuery(endpoints.workspaces(), filter ?? {})),
     getWorkspace: (id) => f<Workspace>(endpoints.workspace(id)),
@@ -375,6 +476,37 @@ function createFixtureClient(runtime: ClientRuntime, d: DemoDataset): SosClient 
   return {
     runtime,
     health: () => after(d.health),
+    session: () =>
+      after({
+        authenticated: true,
+        user: d.users[0],
+        stub: true,
+        provider: "local-stub" as const,
+      }),
+    account: () =>
+      after({
+        authenticated: true,
+        user: d.users[0],
+        stub: true,
+        provider: "local-stub" as const,
+        workspaces: [
+          {
+            ...d.workspace,
+            isDemo: true,
+            role: "owner" as const,
+          },
+        ],
+      }),
+    logout: () => after({ ok: true }),
+    createWorkspace: () =>
+      Promise.reject(
+        new ApiError({
+          message:
+            "Workspace creation is a signed-in API action — the fixture demo has no server. Sign in against a configured API (NEXT_PUBLIC_API_BASE) to create real workspaces.",
+          code: "UNAUTHENTICATED",
+          status: 401,
+        }),
+      ),
     me: () => after(d.users[0]),
     listWorkspaces: () => after(page([d.workspace])),
     getWorkspace: (id) => after(byId([d.workspace], id, "workspace")),

@@ -15,6 +15,9 @@ export const endpoints = {
     /** PUB-04 wires the real flow; the sign-in route references this path. */
     githubStart: () => `${V}/auth/github/start`,
     githubCallback: () => `${V}/auth/github/callback`,
+    session: () => `${V}/auth/session`,
+    /** The account surface (user + workspace memberships with roles). */
+    account: () => `${V}/auth/account`,
     logout: () => `${V}/auth/logout`,
   },
   workspaces: () => `${V}/workspaces`,

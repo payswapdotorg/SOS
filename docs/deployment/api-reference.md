@@ -57,11 +57,28 @@ The generated schema is snapshot-tested (`tests/test_pub01_openapi_snapshot.py`)
 | GET | `/api/v1/providers/status` | truthful per-seam introspection (mode, implementation, status, capabilities, demo flag) |
 | GET | `/api/v1/providers/status/{name}` | |
 
+### PUB-04 additions — authentication + tenancy (browser-flow endpoints;
+### excluded from the frozen OpenAPI snapshot by design — documented here)
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/v1/auth/github/start?next=…` | Begins the OAuth web flow: creates the single-use state (+ server-held PKCE verifier) and 302s to github.com (live) or the LOCAL fake consent surface. `next` is validated as a relative path (open-redirect guard). §13 auth-bucket rate limited. |
+| GET | `/api/v1/auth/github/callback?code&state` | Single-use state validation → PKCE code exchange → identity → user upsert → session (`sos_session` httpOnly/SameSite=Lax, Secure outside LOCAL) + `sos_csrf` readable cookie → 302 to `/signin/callback?status=ok`. Failures redirect with an honest `reason` — never a partial session. |
+| GET | `/api/v1/auth/github/fake/authorize` | LOCAL ONLY — the clearly-labeled fake-GitHub consent page (deterministic fixture identities: demo-owner, alice, bob, octo-newcomer). 403 outside `SOS_ENV=local`. |
+| POST | `/api/v1/auth/github/fake/consent` | LOCAL ONLY — the fake authorization decision (form-encoded `state` + `login`); issues the deterministic code and redirects to the real callback. |
+| GET | `/api/v1/auth/account` | The signed-in user + their workspace memberships with roles (`owner`/`member`) — the tenant-aware navigation source. Derived ONLY from the server-side session. |
+
+`POST /api/v1/auth/login` / `POST /api/v1/auth/logout` / `GET /api/v1/auth/session`
+keep their PUB-01 wire shapes; logout now also enforces the double-submit
+CSRF pair for real (non-stub) sessions and revokes the session server-side.
+Full guide: `docs/deployment/auth-tenancy.md`.
+
 ## Auth/tenant boundary (directive §6; SECURITY S5/S7/S21)
 
 - **Sessions are server-side** — the browser NEVER supplies tenant
   identifiers; the tenant scope derives from the session (LOCAL: stub
-  cookie; PUB-04: GitHub OAuth).
+  cookie or the fake-GitHub flow; PUBLIC: GitHub OAuth with PKCE — PUB-04,
+  see `auth-tenancy.md`).
 - **Anonymous** = read-only demo-workspace access; all mutations → 401.
 - **Authenticated users** read the demo workspace + their member
   workspaces; **mutations require membership** (the demo workspace is

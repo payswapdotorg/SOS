@@ -37,8 +37,8 @@ URLs only** — no absolute API URL is ever hardcoded. Mode resolution:
 | Environment | Behavior |
 |---|---|
 | `NEXT_PUBLIC_API_BASE` **unset** | **Fixture/demo mode** — the typed demo dataset (Journey-1 seed story) is served client-side so the whole cockpit is demonstrable standalone. The UI labels this state `DEMO DATA` everywhere. |
-| `NEXT_PUBLIC_API_BASE=""` (set, empty) | **API mode, same-origin** — requests go to relative `/api/v1/...` paths (deployment where the API is behind the same gateway). |
-| `NEXT_PUBLIC_API_BASE=https://api.example.com` | **API mode** — requests go to that origin + `/api/v1/...`. The value is operator configuration, never code. |
+| `NEXT_PUBLIC_API_BASE=""` (set, empty) | **API mode, same-origin** — requests go to relative `/api/v1/...` paths. **The PUB-04 topology**: `next.config.ts` proxies `/api/v1/*` to `SOS_API_PROXY_TARGET` (default `http://127.0.0.1:8099`) so the OAuth flow and session cookies stay on ONE origin. Set `SOS_API_PROXY_TARGET` (server-side env, never `NEXT_PUBLIC_*`) on Vercel to the API origin. |
+| `NEXT_PUBLIC_API_BASE=https://api.example.com` | **API mode, direct** — requests go to that origin + `/api/v1/...`. NOTE (PUB-04): credentialed browser auth needs CORS + `SameSite=None` cookies on the API, which is NOT configured — use the same-origin proxy topology above for authenticated deployments. |
 | `NEXT_PUBLIC_API_MODE=fixtures` | Forces fixture mode regardless of base (useful for previews). |
 
 In demo mode, the header shows a `DEMO DATA` badge, receipts from the
@@ -50,11 +50,26 @@ nothing is fabricated as persisted truth.
 
 - **Landing** (`/`) — product name, tagline, `Explore Demo` +
   `Sign in with GitHub`.
-- **Sign-in** (`/signin`) — the route is wired for PUB-04 (the OAuth start
-  path from the endpoint map); in fixture mode it explains the flow and
-  performs no fake login.
+- **Sign-in** (`/signin`) — PUB-04 wired: the button navigates to the
+  API's OAuth start (`/api/v1/auth/github/start?next=…` — state + PKCE are
+  server-held; the browser never sees a token). In fixture mode it explains
+  the flow and performs no fake login.
+- **Sign-in callback** (`/signin/callback`) — PUB-04: completes the flow —
+  verifies the API-issued session client-side, routes into the workspace,
+  and renders honest outcomes (success with the provider label — including
+  the `LOCAL fake-GitHub` label — or the specific failure reason from the
+  API; never a fake success).
 - **Workspace shell** (`/workspace/*`) — left nav: Mission / Systems /
   Evidence / Candidates / Experiments / Decisions / Memory / Activity.
+  PUB-04: the header is tenant-aware — a workspace switcher restricted to
+  the SERVER-visible (tenant-scoped) workspaces, the account chip (user +
+  provider label), **New workspace**, and **Sign out** (server-side
+  revocation). The `?ws=` selection is carried across nav links and is
+  never trusted from outside the server list.
+- **Workspace creation** (`/workspace/new`) — PUB-04: a signed-in owner
+  action (name + slug with the server's exact validation rule); the creator
+  becomes the owner and lands in the fresh workspace. In fixture mode the
+  form renders disabled with an honest explanation (no server to mutate).
 - **Mission journey** (`/workspace/mission`) — Mission → Goals → Outcomes →
   Stakeholders → Measures → Constraints → Preferences → *Approve Mission
   Revision*. The user remains the mission authority; approval state
