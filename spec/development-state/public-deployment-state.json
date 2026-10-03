@@ -86,11 +86,22 @@
       "note": "Review-ready at PR #28. Delivered: GitHub OAuth web flow (authorization code + PKCE S256, single-use 10-min state, server-held verifier) with the live github.com client AND the deterministic labeled fake-GitHub LOCAL provider (refused outside SOS_ENV=local); server-side sessions (opaque sos1.* tokens, sha256 at rest in migration 0004 auth_sessions, httpOnly+SameSite=Lax+Secure-non-local cookie, 7d TTL, logout revokes server-side); double-submit CSRF for real sessions (sos_csrf cookie + x-sos-csrf header vs stored token; enforced on the auth mutation surface — per-mutation wiring for remaining routes is PUB-06/PUB-10 lane, disclosed); /auth/account memberships with owner|member roles (session-derived only — browser never supplies tenant ids); §13 auth-bucket rate limits on start/callback/consent; auth login/logout audits. apps/web: live sign-in wiring + /signin/callback completion page, tenant-aware header (server-visible workspace switcher, provider-labeled account chip, sign out), /workspace/new owner creation, ?ws= selection preserved across nav, same-origin /api/v1 rewrite proxy (SOS_API_PROXY_TARGET) keeping the OAuth chain + cookies on one origin (direct cross-origin needs API CORS — outside PUB-04 surface; PUB-03 vercel runbook reconciliation flagged for TL). All PUB-04 endpoints include_in_schema=False so the frozen PUB-01 OpenAPI snapshot stays byte-identical; documented in docs/deployment/auth-tenancy.md + api-reference.md. Gate matrix at implementation head 1b11963: pytest 638 passed (606 baseline + 32 PUB-04; frozen PUB-01 tests green), compileall clean, final_gate_check 12/12, web lint+typecheck clean, bun 99 pass (80+19). Acceptance journey verified BOTH at API level (pytest) and end-to-end in a browser through the proxy (login -> workspace create owner role -> tenant isolation 404/zero-rows -> CSRF-less logout 403 -> logout ok -> token replay dead). Neon persistence fails closed for auth (auth_store_unavailable) until PUB-05 unifies the auth tables — disclosed. Checkpoint: spec/development-state/PUB-04-checkpoint.md. The checkpoint/state commit that follows the implementation head is the final branch tip (adds only checkpoint + this status record — no code). No unmerged sibling dependency, no frozen surface touched, no merge performed."
     },
     "PUB-05": {
-      "status": "PENDING",
+      "status": "MERGED",
       "owner": "Worker A",
       "dependencies": [
         "PUB-01"
-      ]
+      ],
+      "base": "3eeefad72b502d678918e141d70b4f398b1ca9c0",
+      "session": "pub-05-neon-persistence",
+      "dispatchedAt": "2026-10-03T01:05:17Z",
+      "pr": 27,
+      "branch": "work/pub-05-neon-persistence",
+      "implementationHead": "70a751c99ea3564fde12ff0c4c8a6035ce6656ac",
+      "note": "Review-ready at PR #27. Delivered: the Neon adapter (providers/neon/cloud.py — PostgreSQL via the asyncpg async driver, Neon serverless-compatible: sslmode TLS, statement_cache_size=0 for pooled endpoints, connection recycling; dedicated event-loop thread bridging the final SYNC seam; fail-closed DSN validation); the full §11 relational schema as numbered reversible migrations 0004-0011 (value model/context/provider-event completion, architecture nodes/edges/boundary-contracts, evidence artifact METADATA (bytes never in the DB), causal hypotheses, candidate evaluations, assurance results, experiment events, execution requests/receipts) running on BOTH backends through a deterministic Postgres dialect translation (JSON TEXT->JSONB via the shared registry, REAL->DOUBLE PRECISION); the shared db/mapping.py single mapping authority (exact round-trips, deterministic row ids, byte-identical JSON on both backends) with normalized projections on every insert on BOTH adapters; tenant scoping enforced at the adapter on both; the demo seed loading identically on both backends; 70 new tests incl. the full SQLite<->PostgreSQL parity suite (collections row-for-row, getters, cursors, filters, dedup, conflicts, truth states, tenant scoping, normalized-table parity, FastAPI boot on Neon) verified against a REAL local PostgreSQL 16.4 (asyncpg 0.31.0); Postgres tests skip cleanly without asyncpg/Postgres (truthful reasons). Gates at implementation head 70a751c: pytest 676 passed / compileall clean / final_gate_check 12/12 / web lint+typecheck clean / 80 bun tests. Known limitation (operator/TL input for PUB-11): asyncpg is not in the frozen .[api] dependency group and render.yaml (PUB-03 surface) builds with .[api] while running SOS_PERSISTENCE=neon — a one-line wiring decision (api group or Render build command) is needed before the PUBLIC deploy; pyproject.toml/infra are outside PUB-05's allowed surface. Checkpoint: spec/development-state/PUB-05-checkpoint.md. The checkpoint/state commit followed by one same-PR correction commit (a fastapi importorskip guard on one test, keeping the frozen tests workflow green with pytest-only installs; full matrix re-run at the exact final head) is the final branch tip. No unmerged sibling dependency, no frozen surface touched, no merge performed.",
+      "sessionChat": "https://chat.z.ai/c/c390d2ee-456c-4915-8b5c-591f021fad60",
+      "branchHead": "dd5881b0596be6db45f09b2d6e97b7c6ac78bb70",
+      "mergedAs": "65e29adab356cc84d4ce77be00c0c9887ad73076",
+      "reviewRecord": "PR #27 COMMENT ids 5964283638 (main record, exact head 030bf150) + 5964312223 (addendum: same-PR correction dd5881b reviewed in full + fresh matrix at merged head); remote-ref truth gate + fresh TL matrix both heads: pytest 638 passed / 0 failed / 38 truthful pg-parity skips (worker-verified vs real pg 16.4 + asyncpg 0.31.0), compileall clean, final_gate_check OVERALL PASS 12/12 at 030bf150 AND 65e29ad"
     },
     "PUB-06": {
       "status": "PENDING",
@@ -157,10 +168,10 @@
   },
   "currentFrontier": [
     "PUB-04",
-    "PUB-05",
-    "PUB-07"
+    "PUB-07",
+    "PUB-06"
   ],
-  "currentTask": "PUB-04 | PUB-05 | PUB-07 (wave-2 dispatch ready; packets staged, base = live main b389018)",
+  "currentTask": "PUB-04 | PUB-07 (wave-2 sessions in flight) + PUB-06 (deps PUB-01+PUB-05 MERGED — packet staging next, Worker A lane)",
   "notes": [
     "Program authorized by the operator directive recorded verbatim in spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md (received 2026-10-02 in the operator's authenticated session channel).",
     "The frozen W0-W15 artifacts stay authoritative and untouched: implementation-state.json remains ROADMAP_COMPLETE with currentFrontier=[] and currentTask=null; all PUB progress is recorded ONLY in this file.",
