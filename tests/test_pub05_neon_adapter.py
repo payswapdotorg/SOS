@@ -72,6 +72,10 @@ def test_create_app_neon_without_dsn_fails_closed(tmp_path: Path) -> None:
     """The PUB-01 contract test's shape: selecting SOS_PERSISTENCE=neon
     without a valid DSN aborts app construction with a PUB-05-precise
     error (fail-closed; still true now the adapter EXISTS)."""
+    pytest.importorskip(
+        "fastapi",
+        reason="create_app requires the 'api' dependency group",
+    )
     from services.api.config import Settings
     from services.api.main import create_app
 

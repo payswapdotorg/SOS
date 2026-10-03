@@ -6,8 +6,8 @@
 **Branch:** `work/pub-05-neon-persistence`
 **PR:** #27 (https://github.com/payswapdotorg/SOS/pull/27)
 **Base SHA:** `3eeefad72b502d678918e141d70b4f398b1ca9c0` (live `origin/main` HEAD at dispatch — verified reachable from origin/main before work started)
-**Implementation head (all code + tests + docs; all verification below ran here):** `70a751c99ea3564fde12ff0c4c8a6035ce6656ac`
-**Final branch head:** the checkpoint/state commit that follows the implementation head (adds only checkpoint + status documents — no code).
+**Implementation head (all code + tests + docs):** `70a751c99ea3564fde12ff0c4c8a6035ce6656ac`
+**Final branch head:** the checkpoint/state commit followed by one same-PR correction commit (a test-environment guard: `tests/test_pub05_neon_adapter.py` gained `pytest.importorskip("fastapi")` on the single `create_app`-dependent test so the frozen `tests` workflow — which installs only pytest — stays green; the full §G matrix below was re-run at the exact final head).
 
 ## Traceability
 
