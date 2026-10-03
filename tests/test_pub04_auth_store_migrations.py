@@ -1,6 +1,9 @@
 """PUB-04 — the auth store (sessions, OAuth states, membership reads) and
-migration 0004 (auth_sessions + oauth_states): reversible round-trip,
-store semantics, fail-closed non-LOCAL refusal.
+migration 0012 (auth_sessions + oauth_states; renumbered from 0004 in the
+PUB-05 sibling merge reconciliation — the number-keyed migration runner
+cannot carry duplicate numbers, and PUB-05 claimed 0004-0011 from the same
+dispatch base): reversible round-trip, store semantics, fail-closed
+non-LOCAL refusal.
 """
 from __future__ import annotations
 
@@ -35,21 +38,21 @@ from services.api.auth.store import (  # noqa: E402
 from providers.neon.local import LocalSqlitePersistence  # noqa: E402
 
 
-def test_migration_0004_is_a_reversible_pair() -> None:
+def test_migration_0012_is_a_reversible_pair() -> None:
     migrations = discover_migrations()
-    assert 4 in migrations
-    entry = migrations[4]
+    assert 12 in migrations
+    entry = migrations[12]
     assert entry["name"] == "auth_sessions_oauth_states"
-    assert entry["up"].name == "0004_auth_sessions_oauth_states.up.sql"
-    assert entry["down"].name == "0004_auth_sessions_oauth_states.down.sql"
+    assert entry["up"].name == "0012_auth_sessions_oauth_states.up.sql"
+    assert entry["down"].name == "0012_auth_sessions_oauth_states.down.sql"
 
 
-def test_migration_0004_round_trip(tmp_path: Path) -> None:
+def test_migration_0012_round_trip(tmp_path: Path) -> None:
     conn = sqlite3.connect(str(tmp_path / "rt.sqlite3"))
     try:
         labels = migrate_up(conn)
-        assert "0004_auth_sessions_oauth_states" in labels
-        assert applied_numbers(conn) == [1, 2, 3, 4]
+        assert "0012_auth_sessions_oauth_states" in labels
+        assert applied_numbers(conn) == list(range(1, 13))
         conn.execute(
             "INSERT INTO users (id, github_id, login, display_name, created_at) "
             "VALUES ('u1', '1', 'one', 'One', '2026-01-01T00:00:00Z')"
@@ -60,13 +63,25 @@ def test_migration_0004_round_trip(tmp_path: Path) -> None:
             "('s1', 'h1', 'u1', 'github', 'c1', 't', '2999-01-01T00:00:00Z')"
         )
         reverted = migrate_down(conn, target=3)
-        assert reverted == ["0004_auth_sessions_oauth_states"]
+        # the full sibling set (PUB-05's 0004-0011 + this item's renumbered
+        # 0012) reverts back to the PUB-01 head, auth first (highest number)
+        assert reverted == [
+            "0012_auth_sessions_oauth_states",
+            "0011_execution_records",
+            "0010_experiment_events",
+            "0009_assurance_results",
+            "0008_candidate_evaluations",
+            "0007_causal_hypotheses",
+            "0006_evidence_artifacts",
+            "0005_architecture_graph",
+            "0004_section11_completion",
+        ]
         with pytest.raises(sqlite3.OperationalError):
             conn.execute("SELECT * FROM auth_sessions")
         with pytest.raises(sqlite3.OperationalError):
             conn.execute("SELECT * FROM oauth_states")
         again = migrate_up(conn)
-        assert "0004_auth_sessions_oauth_states" in again
+        assert "0012_auth_sessions_oauth_states" in again
         # users survived the round trip (auth tables are additive)
         assert conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1
     finally:

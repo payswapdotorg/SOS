@@ -47,8 +47,10 @@ PUB-01 `CreateWorkspaceRequest` precedent; §C.3 minimums stay in
 labeled, LOCAL-only) + `LiveGitHubOAuth` (httpx, PKCE S256, `read:user`) +
 fail-closed `build_github_oauth` + PKCE helpers.
 
-**`db/migrations/0004_auth_sessions_oauth_states.{up,down}.sql`** (NEW,
-reversible pair).
+**`db/migrations/0012_auth_sessions_oauth_states.{up,down}.sql`** (NEW,
+reversible pair; renumbered from 0004 in the PUB-05 sibling merge reconciliation —
+the dispatch base 3eeefad predated PUB-05's 0004-0011, and the number-keyed
+migration runner cannot carry duplicate numbers).
 
 **`tests/test_pub04_*.py`** (NEW only: 3 files, 32 tests).
 
