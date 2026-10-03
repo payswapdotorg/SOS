@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Activity,
   Beaker,
@@ -29,11 +29,22 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** Preserve the tenant-aware workspace selection (`?ws=`) across nav. */
+function withWorkspaceParam(href: string, wsParam: string | null): string {
+  return wsParam ? `${href}?ws=${encodeURIComponent(wsParam)}` : href;
+}
+
 /**
  * Static variant (no router hooks) — unit-testable; the interactive
- * `WorkspaceNav` renders it with the live pathname.
+ * `WorkspaceNav` renders it with the live pathname (+ the current `?ws=`).
  */
-export function WorkspaceNavStatic({ currentPath = "/workspace" }: { currentPath?: string }) {
+export function WorkspaceNavStatic({
+  currentPath = "/workspace",
+  wsParam = null,
+}: {
+  currentPath?: string;
+  wsParam?: string | null;
+}) {
   return (
     <nav aria-label="Workspace sections">
       <ul className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
@@ -42,7 +53,7 @@ export function WorkspaceNavStatic({ currentPath = "/workspace" }: { currentPath
           return (
             <li key={href} className="shrink-0 lg:shrink">
               <Link
-                href={href}
+                href={withWorkspaceParam(href, wsParam)}
                 aria-current={active ? "page" : undefined}
                 className={`flex min-h-[40px] items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-surface ${
                   active
@@ -63,9 +74,11 @@ export function WorkspaceNavStatic({ currentPath = "/workspace" }: { currentPath
 
 export function WorkspaceNav({ ariaLabelledBy }: { ariaLabelledBy?: string }) {
   const pathname = usePathname() ?? "/workspace";
+  const searchParams = useSearchParams();
+  const wsParam = searchParams.get("ws");
   return (
     <div aria-labelledby={ariaLabelledBy}>
-      <WorkspaceNavStatic currentPath={pathname} />
+      <WorkspaceNavStatic currentPath={pathname} wsParam={wsParam} />
     </div>
   );
 }

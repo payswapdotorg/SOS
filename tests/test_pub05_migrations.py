@@ -35,7 +35,10 @@ from db.runner import (  # noqa: E402
 
 def test_migrations_are_numbered_reversible_pairs() -> None:
     migrations = discover_migrations()
-    assert sorted(migrations) == list(range(1, 12))
+    # 0001-0011 (PUB-01 + PUB-05) + 0012 (PUB-04 auth, renumbered in the
+    # sibling merge reconciliation — the runner is number-keyed, duplicates
+    # are impossible by construction)
+    assert sorted(migrations) == list(range(1, 13))
     for num, entry in migrations.items():
         assert entry["up"].exists() and entry["down"].exists()
 
@@ -46,19 +49,19 @@ def test_sqlite_up_down_up_down_round_trip() -> None:
     conn = sqlite3.connect(db_path)
     try:
         up1 = migrate_up(conn)
-        assert len(up1) == 11
-        assert applied_numbers(conn) == list(range(1, 12))
+        assert len(up1) == 12
+        assert applied_numbers(conn) == list(range(1, 13))
         down1 = migrate_down(conn, 0)
-        assert len(down1) == 11
+        assert len(down1) == 12
         remaining = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' "
             "AND name NOT LIKE 'sqlite_%'"
         ).fetchall()
         assert remaining == [("_migrations",)]
         up2 = migrate_up(conn)
-        assert len(up2) == 11
+        assert len(up2) == 12
         down2 = migrate_down(conn, 0)
-        assert len(down2) == 11
+        assert len(down2) == 12
     finally:
         conn.close()
         Path(db_path).unlink(missing_ok=True)
@@ -72,6 +75,7 @@ def test_sqlite_partial_revert_reapplies_cleanly() -> None:
         migrate_up(conn)
         down = migrate_down(conn, 3)  # back to the PUB-01 head
         assert down == [
+            "0012_auth_sessions_oauth_states",
             "0011_execution_records", "0010_experiment_events",
             "0009_assurance_results", "0008_candidate_evaluations",
             "0007_causal_hypotheses", "0006_evidence_artifacts",
@@ -85,8 +89,8 @@ def test_sqlite_partial_revert_reapplies_cleanly() -> None:
         assert "architecture_nodes" not in tables
         assert "evidence" in tables and "jobs" in tables
         up = migrate_up(conn)
-        assert len(up) == 8
-        assert applied_numbers(conn) == list(range(1, 12))
+        assert len(up) == 9
+        assert applied_numbers(conn) == list(range(1, 13))
     finally:
         conn.close()
         Path(db_path).unlink(missing_ok=True)
@@ -286,7 +290,7 @@ def test_postgres_up_down_up_round_trip(pg_database: str) -> None:
             await conn.close()
 
     up1, down, up2, _ = asyncio.run(_run())
-    assert len(up1) == 11 and len(down) == 11 and len(up2) == 11
+    assert len(up1) == 12 and len(down) == 12 and len(up2) == 12
 
 
 def test_postgres_jsonb_round_trips_values(pg_database: str) -> None:
