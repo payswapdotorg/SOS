@@ -73,6 +73,20 @@ keep their PUB-01 wire shapes; logout now also enforces the double-submit
 CSRF pair for real (non-stub) sessions and revokes the session server-side.
 Full guide: `docs/deployment/auth-tenancy.md`.
 
+### PUB-07 additions — the evidence/artifact layer (excluded from the
+### frozen OpenAPI snapshot by design — documented here)
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/api/v1/artifacts/uploads` | Request a signed upload slot. Body: `{workspaceId, systemId, category, contextId, subcategory?, filename?, contentType?, sizeBytes, sha256}`. Authenticated + workspace MEMBERSHIP + §13 write bucket + CSRF (real sessions). `sizeBytes` is validated against `SOS_RATE_ARTIFACT_MAX_MB` (413 `PAYLOAD_TOO_LARGE`, `maxArtifactMb`); `sha256` is the content address of the §12 key. Returns `{key, method: "PUT", url, expiresAt, maxBytes, store}` — R2 mode: a SigV4 presigned PUT (direct-to-bucket, secret never in the browser); LOCAL: a token redeemed at `/artifacts/object`. |
+| POST | `/api/v1/artifacts/downloads` | Request a signed download URL. Body: `{key}`. Authenticated + read-scope tenant check (the evidence read surface; cross-tenant keys 404) + CSRF. Returns `{key, method: "GET", url, expiresAt, store}`. |
+| GET/PUT | `/api/v1/artifacts/object?token=…` | The LOCAL token redemption (byte transfer). The grant — not a session — authorizes: time-bounded, scoped to ONE key + ONE mode, HMAC-signed. PUT enforces the artifact size cap and the content address (bytes' sha256 MUST equal the key's hash; 422 otherwise); exempt from the generic S16 body cap (the artifact cap applies); audits `artifact.upload_completed`. GET serves the bytes with the stored content type + sha256 ETag; audits `artifact.download_served`. |
+
+Signed-URL lifetimes: 600 s (upload), 300 s (download). Artifact audit
+actions: `artifact.upload_authorized`, `artifact.upload_completed`,
+`artifact.download_authorized`, `artifact.download_served`. Full guide:
+[artifacts.md](artifacts.md).
+
 ## Auth/tenant boundary (directive §6; SECURITY S5/S7/S21)
 
 - **Sessions are server-side** — the browser NEVER supplies tenant
@@ -114,6 +128,6 @@ provenance, results and truth states pass through verbatim.
 `SOS_PERSISTENCE|SOS_COORDINATION|SOS_ARTIFACTS|SOS_EXECUTION` select the
 seam implementations (default: all LOCAL — SQLite, in-process, local-FS
 content-addressed store with the directive §12 key layout, DemoProvider).
-Cloud adapters arrive with PUB-05 (Neon), PUB-06 (Upstash), PUB-07 (R2),
-PUB-08 (Apify); selecting them before they exist fails closed with a
-precise error (never a silent LOCAL fallback).
+Cloud adapters: Neon (PUB-05), Upstash (PUB-06), R2 (PUB-07 — real,
+`SOS_ARTIFACTS=r2` boots the S3 SigV4 adapter), Apify (PUB-08, pending —
+selecting it fails closed with a precise error, never a silent fallback).

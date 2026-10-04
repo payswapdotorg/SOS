@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from . import (
+    artifacts,
     auth,
     candidates,
     decisions,
@@ -26,6 +27,7 @@ def build_api_v1_router() -> APIRouter:
     router.include_router(health.router)
     router.include_router(auth.router)
     router.include_router(me.router)
+    router.include_router(artifacts.router)
     router.include_router(workspaces.router)
     router.include_router(missions.router)
     router.include_router(systems.router)
