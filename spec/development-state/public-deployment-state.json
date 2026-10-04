@@ -124,11 +124,18 @@
       "reviewRecord": "PR #29 COMMENT id 5964725106 (worker head 3c966d0: matrix 691-pytest/0-fail/38-pg-skips exact-match + gate 12/12 + surface 25/25 incl. disclosed config.py judgment call + secret scan clean incl. documented false-positive audit; TL reconciliation ON the branch: 86fb7df sync-merge of main + 54648a6 pyc-strip of 5 committed __pycache__ build artifacts, disclosed, no source changes; fresh matrix at 54648a6: 723/0/38 + gate 12/12 + web 99/0)"
     },
     "PUB-07": {
-      "status": "PENDING",
+      "status": "WAITING_FOR_ARCHITECT",
       "owner": "Worker C",
       "dependencies": [
         "PUB-01"
-      ]
+      ],
+      "base": "bbf997f68f026842205eae19d35556acb0b7717c",
+      "session": "pub-07-r2-artifacts",
+      "sessionChat": "https://chat.z.ai/c/33a95341-506d-46d9-969f-bd807761dde5",
+      "dispatchedAt": "2026-10-03T04:00:00Z",
+      "branch": "work/pub-07-r2-artifacts",
+      "implementationHead": "fd55cb04f1ceb7fa48364fd8d1723b5813a789b1",
+      "note": "Review-ready at the branch (PR opened by the worker session). Delivered: the artifact-store seam completed on BOTH backends — the LOCAL content-addressed FS store hardened (in-store size limits S15 on put AND put_by_key; full §12 tree validation on every read/write = the path-traversal defense; actor-bound signed grants with resolve_grant; head metadata; put_by_key content-address verification) and the real R2 S3 SigV4 adapter replacing the fail-closed placeholder (stdlib-only signed requests + presigned GET/PUT URLs with LOCAL signature re-verification: tamper/expiry/wrong-endpoint/mode-confusion rejected; injectable scripted transport — the PUB-06 precedent; private-bucket posture: no public-URL surface, secret never in URLs; fail-closed config naming PUB-07 and the SOS_R2_* names); the deterministic §12 key layout as a single authority (providers/r2/layout.py — build_key/parse_key/key_content_hash; both adapters parity-tested; write paths enforce 64-hex content addressing, read paths accept the seed's lawful short-hash tree keys as honest 404s — disclosed judgment call); the transport routes (POST /artifacts/uploads: authenticated + membership + §13 write bucket + CSRF + 413 size pre-declaration + system-in-workspace check → signed put URL — R2 presigned direct-to-bucket, LOCAL HMAC token; POST /artifacts/downloads: authenticated + read-scope tenant check (cross-tenant 404) → signed get URL; GET/PUT /artifacts/object: the LOCAL token redemption — grant-authoritative like an S3 presigned URL, one key + one mode + time-bounded, artifact cap at Content-Length AND post-read, content-address 422 on mismatch, sha256 ETag on GET); 4 audit actions (upload_authorized/upload_completed/download_authorized/download_served, recentActivity-asserted); session-secret signing-key wiring for non-LOCAL deployments (demo-key forgery refused under a real key — test-asserted). All 4 routes include_in_schema=False (the PUB-04 post-§7 precedent; frozen OpenAPI digest asserted byte-identical). Gates at implementation head fd55cb0: pytest 764 passed/38 truthful pg-skips/0 failed (723 baseline + 41 new across test_pub07_local_store/r2_adapter/artifact_routes); compileall clean; final_gate_check 12/12; web lint+typecheck clean; 99 bun tests; plus a REAL uvicorn zero-env LOCAL boot with a full HTTP upload→download round-trip. Surface judgment calls disclosed in the checkpoint: main.py+worker.py artifacts-block wiring (PUB-05 main.py precedent), the scoped S16 exemption in rate_limit.py (artifact cap enforced at the route instead; both sides test-asserted), the include_in_schema=False set, and the read/write key-name law split (directive §12 'whenever possible'). Known limitations (truthful): live R2 I/O at PUB-11 (operator credentials; semantics covered against a scripted fake); demo-seed artifactRefs are byteless references (honest 404s); R2-side transfers are client↔R2 (issuance-side audit only — the S3 pattern); TTLs are module constants, no new env names. Checkpoint: spec/development-state/PUB-07-checkpoint.md. The checkpoint/state commit is the final branch tip (adds only checkpoint + this status record — no code after fd55cb0). No unmerged sibling dependency, no frozen surface touched, no merge performed."
     },
     "PUB-08": {
       "status": "PENDING",
@@ -181,7 +188,7 @@
   "currentFrontier": [
     "PUB-07"
   ],
-  "currentTask": "PUB-07 (round-2 in flight, base c2df437); PUB-08 becomes dispatchable when PUB-07 lands (deps PUB-06+PUB-07 both then merged)",
+  "currentTask": "PUB-07 review-ready: WAITING_FOR_ARCHITECT at implementation head fd55cb0 (round-3 session pub-07-r2-artifacts, base bbf997f, branch pushed + PR open); PUB-08 becomes dispatchable when PUB-07 lands (deps PUB-06+PUB-07 both then merged)",
   "notes": [
     "Program authorized by the operator directive recorded verbatim in spec/deployment/PUBLIC-DEPLOYMENT-DIRECTIVE.md (received 2026-10-02 in the operator's authenticated session channel).",
     "The frozen W0-W15 artifacts stay authoritative and untouched: implementation-state.json remains ROADMAP_COMPLETE with currentFrontier=[] and currentTask=null; all PUB progress is recorded ONLY in this file.",
