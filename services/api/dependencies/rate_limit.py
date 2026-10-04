@@ -30,6 +30,14 @@ from ..errors import error_body, CODE_RATE_LIMITED
 
 _BODY_MAX_DEFAULT = 1 * 1024 * 1024
 
+# The PUB-07 artifact token-redemption endpoint transfers RAW ARTIFACT
+# BYTES: it is exempt from the GENERIC S16 body cap and enforces the
+# artifact-specific cap (SOS_RATE_ARTIFACT_MAX_MB, S15) itself — both a
+# Content-Length pre-check and the post-read length (see
+# services/api/routes/artifacts.py). The exemption is scoped to this
+# exact path; every other request keeps the generic cap.
+ARTIFACT_OBJECT_PATH = "/api/v1/artifacts/object"
+
 # Workspace-target extraction: a ``/api/v1/workspaces/{id}`` path prefix
 # (the first path segment pair under /api/v1).
 _WORKSPACE_PATH_RE = re.compile(r"^/api/v1/workspaces/([^/?#]+)")
@@ -74,19 +82,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         coordination = self._container.coordination
         ip = _client_ip(request)
 
-        # S16: request payload cap (Content-Length pre-check).
-        max_bytes = settings.rate_body_max_mb * 1024 * 1024
-        content_length = request.headers.get("content-length")
-        if content_length and content_length.isdigit():
-            if int(content_length) > max_bytes:
-                return JSONResponse(
-                    status_code=413,
-                    content=error_body(
-                        "PAYLOAD_TOO_LARGE",
-                        "request payload too large",
-                        {"maxBodyMb": settings.rate_body_max_mb},
-                    ),
-                )
+        # S16: request payload cap (Content-Length pre-check). The
+        # artifact redemption endpoint is exempt here — it enforces the
+        # artifact-specific cap (S15) at the route, allowing bounded
+        # artifact uploads larger than the generic JSON body cap.
+        if request.url.path != ARTIFACT_OBJECT_PATH:
+            max_bytes = settings.rate_body_max_mb * 1024 * 1024
+            content_length = request.headers.get("content-length")
+            if content_length and content_length.isdigit():
+                if int(content_length) > max_bytes:
+                    return JSONResponse(
+                        status_code=413,
+                        content=error_body(
+                            "PAYLOAD_TOO_LARGE",
+                            "request payload too large",
+                            {"maxBodyMb": settings.rate_body_max_mb},
+                        ),
+                    )
 
         # Per-IP bucket (all traffic). A coordination-plane failure fails
         # CLOSED for protected traffic (503 PROVIDER_UNAVAILABLE) — the

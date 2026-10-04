@@ -135,19 +135,31 @@ def _build_adapters(
 
         coordination = build_upstash_coordination(str(settings.redis_url))
 
-    # Artifacts: LOCAL content-addressed FS | R2 (fail-closed, PUB-07).
+    # Artifacts: LOCAL content-addressed FS | R2 S3 SigV4 (fail-closed,
+    # PUB-07). Both stores enforce the §13/S15 artifact size cap in the
+    # adapter itself (max_bytes); the LOCAL store signs redemption tokens
+    # with the session secret in non-LOCAL envs (the deterministic DEMO
+    # key is LOCAL-only — clearly labeled, never a browser credential).
     if artifacts is not None:
         pass
     elif settings.artifacts_mode == "local":
         from providers.r2.local import LocalFsArtifactStore
 
-        artifacts = LocalFsArtifactStore(settings.local_artifacts_dir)
+        artifacts = LocalFsArtifactStore(
+            settings.local_artifacts_dir,
+            signing_key=(
+                settings.session_secret.encode("utf-8")
+                if settings.session_secret else None
+            ),
+            max_bytes=settings.rate_artifact_max_mb * 1024 * 1024,
+        )
     else:
         from providers.r2.cloud import build_r2_artifact_store
 
         artifacts = build_r2_artifact_store(
             str(settings.r2_endpoint), str(settings.r2_access_key_id),
             str(settings.r2_secret_access_key), str(settings.r2_bucket),
+            max_bytes=settings.rate_artifact_max_mb * 1024 * 1024,
         )
 
     # Execution: DemoProvider | Apify (fail-closed placeholder, PUB-08).

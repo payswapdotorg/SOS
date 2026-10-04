@@ -1,8 +1,29 @@
 """LOCAL artifact adapter: content-addressed local-FS store with the exact
-directive §12 key layout (PUB-01). Signed-URL equivalents are HMAC tokens
-(time-bounded, scoped to the exact object key) signed with the configured key
-material — a clearly-labeled deterministic DEMO key in LOCAL mode; PUB-07
-replaces this with real R2 signed URLs on the same seam."""
+directive §12 key layout (PUB-01; hardened by PUB-07).
+
+PUB-07 hardening (all inside the ``providers/r2/**`` surface):
+
+- **size limits enforced in the store** (``max_bytes`` construction bound;
+  directive §13 "Artifact uploads: size-limited", SECURITY S15) — on the
+  layout-built ``put`` AND the redemption ``put_by_key``;
+- **path-traversal defense**: every read/write path goes through
+  :func:`providers.r2.layout.parse_key`, which accepts ONLY the exact
+  governed §12 layout (no separator tricks, no ``..`` segments);
+- **content-address verification** on ``put_by_key`` (the signed-URL
+  redemption path): the bytes' sha256 MUST equal the key's hash segment —
+  a put-scoped token cannot store content under a different address;
+- **richer signed-URL grants**: tokens now bind the requesting ``actor``
+  (audit accountability at redemption) — ``resolve_grant`` returns the
+  full grant; ``resolve_signed_url`` keeps the PUB-01 shape.
+
+Signing key material: LOCAL mode signs with a clearly-labeled deterministic
+DEMO key (``NOT A SECRET`` — the LOCAL/fixture posture); non-LOCAL
+deployments running the local filesystem store pass real key material via
+``signing_key`` (the app factory wires ``SOS_SESSION_SECRET`` — see
+``services/api.main._build_adapters``). PUB-07's R2 adapter
+(:mod:`providers.r2.cloud`) signs real S3 SigV4 presigned URLs on the same
+seam.
+"""
 from __future__ import annotations
 
 import base64
@@ -13,19 +34,24 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .seam import SeamHealth, StoredArtifact
-
-# Directive §12 layout categories (binding).
-CATEGORIES = frozenset({
-    "revisions", "recovery", "evidence", "experiments", "executions",
-})
-EXECUTION_SUBCATEGORIES = frozenset({"logs", "reports", "receipts", "bundles"})
+from . import layout
+from .layout import (  # noqa: F401  (re-exported: PUB-01 import sites)
+    CATEGORIES,
+    EXECUTION_SUBCATEGORIES,
+    InvalidArtifactKey,
+)
+from .seam import (
+    ArtifactHead,
+    ArtifactSignatureError,
+    ArtifactTooLarge,
+    SeamHealth,
+    SignedGrant,
+    StoredArtifact,
+)
 
 _DEMO_KEY_MATERIAL = b"sos-local-demo-artifact-signing-key (NOT A SECRET)"
 
-
-class ArtifactSignatureError(Exception):
-    """A signed-URL token is invalid, expired, or scope-mismatched."""
+_DEFAULT_CONTENT_TYPE = "application/octet-stream"
 
 
 class LocalFsArtifactStore:
@@ -34,10 +60,17 @@ class LocalFsArtifactStore:
     mode = "local"
     implementation = "local-fs"
 
-    def __init__(self, root: str | Path, *, signing_key: bytes | None = None):
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        signing_key: bytes | None = None,
+        max_bytes: int | None = None,
+    ):
         self._root = Path(root)
         self._root.mkdir(parents=True, exist_ok=True)
         self._signing_key = signing_key or _DEMO_KEY_MATERIAL
+        self._max_bytes = max_bytes
 
     # -- layout ---------------------------------------------------------
 
@@ -52,26 +85,16 @@ class LocalFsArtifactStore:
         content_hash: str,
         filename: str,
     ) -> str:
-        if category not in CATEGORIES:
-            raise ValueError(f"unknown artifact category '{category}'")
-        parts = [f"tenants/{tenant_id}", f"systems/{system_id}"]
-        if category == "executions":
-            if subcategory not in EXECUTION_SUBCATEGORIES:
-                raise ValueError(
-                    f"unknown execution artifact subcategory '{subcategory}'"
-                )
-            parts.append(f"{category}/{context_id}/{subcategory}")
-        else:
-            if subcategory:
-                raise ValueError(
-                    f"subcategory is only lawful for executions, got "
-                    f"'{subcategory}'"
-                )
-            parts.append(f"{category}/{context_id}")
-        name = f"{content_hash}"
-        if filename:
-            name += f"-{filename}"
-        return "/".join(parts) + "/" + name
+        """The deterministic §12 key (single authority: providers.r2.layout)."""
+        return layout.build_key(
+            tenant_id,
+            system_id,
+            category=category,
+            context_id=context_id,
+            subcategory=subcategory,
+            content_hash=content_hash,
+            filename=filename,
+        )
 
     # -- seam surface ----------------------------------------------------
 
@@ -89,6 +112,13 @@ class LocalFsArtifactStore:
                 status="FAILED", detail=f"local artifact store unusable: {exc}"
             )
 
+    def _enforce_size(self, content: bytes) -> None:
+        if self._max_bytes is not None and len(content) > self._max_bytes:
+            raise ArtifactTooLarge(
+                f"artifact is {len(content)} bytes; the store limit is "
+                f"{self._max_bytes} bytes (SOS_RATE_ARTIFACT_MAX_MB)"
+            )
+
     def put(
         self,
         tenant_id: str,
@@ -101,8 +131,9 @@ class LocalFsArtifactStore:
         content_type: str,
         filename: str = "",
     ) -> StoredArtifact:
+        self._enforce_size(content)
         content_hash = hashlib.sha256(content).hexdigest()
-        key = self.build_key(
+        key = layout.build_key(
             tenant_id,
             system_id,
             category=category,
@@ -111,12 +142,44 @@ class LocalFsArtifactStore:
             content_hash=content_hash,
             filename=filename,
         )
-        path = self._root / key
+        return self._write_content_addressed(
+            key, content, content_type, content_hash
+        )
+
+    def put_by_key(
+        self, key: str, content: bytes, content_type: str,
+    ) -> StoredArtifact:
+        """Store at an already-built §12 key, verifying the content address.
+
+        This is the signed-upload-URL redemption path: a put grant scoped
+        to ``key`` can only ever land bytes whose sha256 IS the key's
+        address — content addressing closes the substitution hole. Keys
+        whose object name is not the 64-hex content address (legacy
+        read-only surface) are refused here.
+        """
+        self._enforce_size(content)
+        addressed_hash = layout.key_content_hash(key)
+        content_hash = hashlib.sha256(content).hexdigest()
+        if content_hash != addressed_hash:
+            raise layout.InvalidArtifactKey(
+                "content address mismatch: bytes hash to "
+                f"{content_hash} but the key addresses "
+                f"{addressed_hash}"
+            )
+        return self._write_content_addressed(
+            key, content, content_type, content_hash
+        )
+
+    def _write_content_addressed(
+        self, key: str, content: bytes, content_type: str,
+        content_hash: str,
+    ) -> StoredArtifact:
+        path = self._resolve(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         if not path.exists():
             path.write_bytes(content)
         meta = {
-            "contentType": content_type,
+            "contentType": content_type or _DEFAULT_CONTENT_TYPE,
             "size": len(content),
             "createdAt": time.strftime(
                 "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
@@ -129,23 +192,58 @@ class LocalFsArtifactStore:
             )
         return StoredArtifact(key=key, sha256=content_hash, size=len(content))
 
+    def _resolve(self, key: str) -> Path:
+        """The filesystem path for ``key`` — validated §12 layout only."""
+        layout.parse_key(key)  # the traversal defense
+        return self._root / key
+
     def get(self, key: str) -> bytes:
-        path = self._root / key
+        path = self._resolve(key)
         if not path.is_file():
             raise KeyError(f"artifact not found: {key}")
         return path.read_bytes()
 
     def exists(self, key: str) -> bool:
-        return (self._root / key).is_file()
+        try:
+            return self._resolve(key).is_file()
+        except layout.InvalidArtifactKey:
+            return False
+
+    def head(self, key: str) -> ArtifactHead | None:
+        path = self._resolve(key)
+        if not path.is_file():
+            return None
+        content_type = _DEFAULT_CONTENT_TYPE
+        meta_path = path.with_name(path.name + ".meta.json")
+        if meta_path.is_file():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                content_type = str(
+                    meta.get("contentType") or _DEFAULT_CONTENT_TYPE
+                )
+            except ValueError:
+                pass  # honest default; the bytes remain readable
+        return ArtifactHead(
+            key=key, size=path.stat().st_size, content_type=content_type
+        )
 
     # -- signed URL equivalents -------------------------------------------
 
-    def signed_url(self, key: str, *, ttl_seconds: int, mode: str) -> str:
+    def signed_url(
+        self,
+        key: str,
+        *,
+        ttl_seconds: int,
+        mode: str,
+        actor: str = "",
+    ) -> str:
         if mode not in ("get", "put"):
             raise ValueError(f"unknown signed-url mode '{mode}'")
+        layout.parse_key(key)  # only governed keys get grants
         expiry = int(time.time()) + ttl_seconds
         payload = json.dumps(
-            {"key": key, "mode": mode, "exp": expiry}, sort_keys=True
+            {"key": key, "mode": mode, "exp": expiry, "actor": actor},
+            sort_keys=True,
         ).encode("utf-8")
         body = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
         sig = hmac.new(
@@ -153,7 +251,7 @@ class LocalFsArtifactStore:
         ).hexdigest()
         return f"sos-local-artifact://{body}?sig={sig}"
 
-    def resolve_signed_url(self, token: str, *, now: float) -> tuple[str, str]:
+    def resolve_grant(self, token: str, *, now: float) -> SignedGrant:
         if not token.startswith("sos-local-artifact://"):
             raise ArtifactSignatureError("not a local signed artifact token")
         rest = token[len("sos-local-artifact://"):]
@@ -173,6 +271,26 @@ class LocalFsArtifactStore:
             )
         except (ValueError, UnicodeDecodeError) as exc:
             raise ArtifactSignatureError(f"malformed token body: {exc}") from exc
-        if float(payload["exp"]) < now:
+        key = str(payload["key"])
+        mode = str(payload["mode"])
+        if mode not in ("get", "put"):
+            raise ArtifactSignatureError(f"unknown grant mode '{mode}'")
+        expires_at = int(payload["exp"])
+        if float(expires_at) < now:
             raise ArtifactSignatureError("signed URL expired")
-        return str(payload["key"]), str(payload["mode"])
+        try:
+            layout.parse_key(key)
+        except layout.InvalidArtifactKey as exc:
+            raise ArtifactSignatureError(
+                f"grant key is not a lawful §12 key: {exc}"
+            ) from exc
+        return SignedGrant(
+            key=key,
+            mode=mode,
+            actor=str(payload.get("actor") or ""),
+            expires_at=expires_at,
+        )
+
+    def resolve_signed_url(self, token: str, *, now: float) -> tuple[str, str]:
+        grant = self.resolve_grant(token, now=now)
+        return grant.key, grant.mode
